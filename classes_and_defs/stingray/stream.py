@@ -1,5 +1,7 @@
 import math
 
+from ...utils.math import MakeTenBitUnsigned, TenBitUnsigned
+
 class StreamComponentInfo:
     def __init__(self, type="position", format="float"):
         self.Type   = self.TypeFromName(type)
