@@ -13,8 +13,9 @@ TypeHashPath      = f"{AddonPath}\\hashes\\typeHashes.txt"
 FileHashPath      = f"{AddonPath}\\hashes\\fileHashes.txt"
 FriendlyNamesPath = f"{AddonPath}\\hashes\\friendlyNames.txt"
 
-PalettePath         = f"{AddonPath}\\dats\\normalPalette.dat"
-DefaultMaterialPath = f"{AddonPath}\\dats\\basic.dat"
+PalettePath = f"{AddonPath}\\dats\\normalPalette.dat"
+
+DefaultMaterialPath = f"{AddonPath}\\dats\\materials\\basic.dat"
 
 CPPHelper  = ctypes.cdll.LoadLibrary(DLLPath) if os.path.isfile(DLLPath) else None
 TocManager = TocManager()
