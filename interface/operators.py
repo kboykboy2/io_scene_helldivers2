@@ -89,14 +89,14 @@ class DumpArchiveObjectOperator(Operator, ExportHelper):
         for Entry in Entries:
             if Entry != None:
                 data = Entry.GetData()
-                FileName = str(Entry.FileID)+"."+GetTypeNameFromID(Entry.TypeID)
-                with open(self.directory + FileName, "w+b") as f:
+                FileName = f"{Entry.FileID}.{GetTypeNameFromID(Entry.TypeID)}"
+                with open(f"{self.directory}{FileName}", "w+b") as f:
                     f.write(data[0])
                 if data[1] != b"":
-                    with open(self.directory + FileName+".gpu", "w+b") as f:
+                    with open(f"{self.directory}{FileName}.gpu", "w+b") as f:
                         f.write(data[1])
                 if data[2] != b"":
-                    with open(self.directory + FileName+".stream", "w+b") as f:
+                    with open(f"{self.directory}{FileName}.stream", "w+b") as f:
                         f.write(data[2])
         return{"FINISHED"}
 
@@ -364,7 +364,7 @@ class BatchExportTextureOperator(Operator):
             Entry = globals.TocManager.GetEntry(EntryID, globals.TexID)
             if Entry != None:
                 data = Entry.Load(False, False)
-                with open(self.directory + str(Entry.FileID)+".dds", "w+b") as f:
+                with open(f"{self.directory}{Entry.FileID}.dds", "w+b") as f:
                     f.write(Entry.LoadedData.ToDDs())
         return{"FINISHED"}
 
@@ -531,8 +531,8 @@ class SearchArchivesOperator(Operator):
                         for friendlysearch in friendlysearches:
                             if str(Entry.FileID).find(friendlysearch) != -1:
                                 NumMatches += 1
-                if NumMatches > 0 and [Archive, Archive.Name+": "+str(NumMatches)] not in self.ArchivesToDisplay:
-                    self.ArchivesToDisplay.append([Archive, Archive.Name+": "+str(NumMatches)])
+                if NumMatches > 0 and [Archive, f"{Archive.Name}: {NumMatches}"] not in self.ArchivesToDisplay:
+                    self.ArchivesToDisplay.append([Archive, f"{Archive.Name}: {NumMatches}"])
 
         # Draw Open All Archives Button
         if len(self.ArchivesToDisplay) > 50:

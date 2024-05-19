@@ -129,7 +129,7 @@ def AddMaterialToBlend(ID, StringrayMat, EmptyMatExists=False):
         # Apply Texture
         try: texImage.image = bpy.data.images[str(TextureID)]
         except:
-            print("Failed to load texture: "+str(TextureID))
+            print(f"Failed to load texture: {TextureID}")
             pass
         idx +=1
 

@@ -187,7 +187,7 @@ class HellDivers2ToolsPanel(Panel):
         row.prop(scene.Hd2ToolPanelSettings, "PatchOnly", text="")
         # Draw Paste Button
         row = layout.row(align=True)
-        row.operator("helldiver2.archive_paste", icon="PASTEDOWN", text="Paste "+str(len(globals.TocManager.CopyBuffer)))
+        row.operator("helldiver2.archive_paste", icon="PASTEDOWN", text=f"Paste {len(globals.TocManager.CopyBuffer)}")
         row.operator("helldiver2.archive_clearclipboard", icon="TRASH", text="Clear Clipboard")
         row = layout.row()
 

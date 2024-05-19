@@ -66,13 +66,11 @@ def SaveFriendlyNames():
     with open(globals.FileHashPath, "w") as f:
         for hash_info in globals.NameHashes:
             if hash_info[1] != "" and int(hash_info[0]) == Hash64(hash_info[1]):
-                string = str(hash_info[0]) + " " + str(hash_info[1])
-                f.writelines(string+"\n")
+                f.writelines(f"{hash_info[0]} {hash_info[1]}\n")
     with open(globals.FriendlyNamesPath, "w") as f:
         for hash_info in globals.NameHashes:
             if hash_info[1] != "":
-                string = str(hash_info[0]) + " " + str(hash_info[1])
-                f.writelines(string+"\n")
+                f.writelines(f"{hash_info[0]} {hash_info[1]}\n")
 
 def AddFriendlyName(ID, Name):
     globals.TocManager.SavedFriendlyNames = []

@@ -206,11 +206,13 @@ class StreamToc:
         self.GpuFile    = MemoryStream()
         self.StreamFile = MemoryStream()
         if SerializeData:
-            if os.path.isfile(path+".gpu_resources"):
-                with open(path+".gpu_resources", "r+b") as f:
+            resPath = f"{path}.gpu_resources"
+            if os.path.isfile(resPath):
+                with open(resPath, "r+b") as f:
                     self.GpuFile = MemoryStream(f.read())
-            if os.path.isfile(path+".stream"):
-                with open(path+".stream", "r+b") as f:
+            streamPath = f"{path}.stream"
+            if os.path.isfile(streamPath):
+                with open(streamPath, "r+b") as f:
                     self.StreamFile = MemoryStream(f.read())
         return self.Serialize(SerializeData)
 
@@ -223,9 +225,9 @@ class StreamToc:
 
         with open(path, "w+b") as f:
             f.write(bytes(self.TocFile.Data))
-        with open(path+".gpu_resources", "w+b") as f:
+        with open(f"{path}.gpu_resources", "w+b") as f:
             f.write(bytes(self.GpuFile.Data))
-        with open(path+".stream", "w+b") as f:
+        with open(f"{path.stream}", "w+b") as f:
             f.write(bytes(self.StreamFile.Data))
 
     def GetFileData(self, FileID, TypeID):
@@ -406,7 +408,7 @@ class TocManager():
         # TODO: ask for which patch index
         path = self.ActiveArchive.Path
         if path.find(".patch_") != -1:
-            num = int(path[path.find(".patch_")+len(".patch_"):]) + 1
+            num = int(path[path.find(".patch_") + len(".patch_"):]) + 1
             path = path[:path.find(".patch_")] + ".patch_" + str(num)
         else:
             path += ".patch_0"

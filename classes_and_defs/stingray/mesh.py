@@ -186,13 +186,13 @@ def NameFromMesh(mesh, id, customization_info, bone_names, use_sufix=True):
         Slot        = customization_info.Slot.replace("HelldiverCustomizationSlot_", "")
         Weight      = customization_info.Weight.replace("HelldiverCustomizationWeight_", "")
         PieceType   = customization_info.PieceType.replace("HelldiverCustomizationPieceType_", "")
-        name = Slot+"_"+PieceType+"_"+BodyType
-    name_sufix = "_lod"+str(mesh.LodIndex)
+        name = f"{Slot}_{PieceType}_{BodyType}"
+    name_sufix = f"_lod{mesh.LodIndex}"
     if mesh.LodIndex == -1:
-        name_sufix = "_mesh"+str(mesh.MeshInfoIndex)
+        name_sufix = f"_mesh{mesh.MeshInfoIndex}"
     if mesh.IsPhysicsBody():
-        name_sufix = "_phys"+str(mesh.MeshInfoIndex)
-    if use_sufix: name = name + name_sufix
+        name_sufix = f"_phys{mesh.MeshInfoIndex}"
+    if use_sufix: name = f"{name}{name_sufix}"
 
     if use_sufix and bone_names != None:
         for bone_name in bone_names:
@@ -294,7 +294,7 @@ def CreateModel(model, id, customization_info, bone_names):
                     weight_value = weights[weight_idx]
                     bone_index   = indices[weight_idx]
                     #bone_index   = mesh.DEV_BoneInfo.GetRealIndex(bone_index)
-                    group_name   = str(group_index) + "_" + str(bone_index)
+                    group_name   = f"{group_index}_{bone_index}"
                     if group_name not in created_groups:
                         created_groups.append(group_name)
                         new_vertex_group = new_object.vertex_groups.new(name=str(group_name))

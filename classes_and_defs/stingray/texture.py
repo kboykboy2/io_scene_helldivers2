@@ -98,8 +98,8 @@ def LoadStingrayTexture(ID, TocData, GpuData, StreamData, Reload, MakeBlendObjec
 
     if MakeBlendObject and not (exists and not Reload):
         tempdir = tempfile.gettempdir()
-        path = tempdir + "\\" + str(ID) + ".dds";
-        tga_path = tempdir + "\\" + str(ID) + ".tga";
+        path = f"{tempdir}\\{ID}.dds"
+        tga_path = f"{tempdir}\\{ID}.tga"
         with open(path, "w+b") as f:
             f.write(dds)
 
@@ -120,13 +120,13 @@ def LoadStingrayTexture(ID, TocData, GpuData, StreamData, Reload, MakeBlendObjec
             os.remove(path)
         else:
             os.remove(path)
-            raise Exception("Failed to convert tex "+str(ID)+" dds to tga, or dds failed to export")
+            raise Exception(f"Failed to convert tex {ID} dds to tga, or dds failed to export")
     return StingrayTex
 
 def BlendImageToStingrayTexture(image, StingrayTex):
     tempdir  = tempfile.gettempdir()
-    dds_path = tempdir + "\\" + "blender_img" + ".dds";
-    tga_path = tempdir + "\\" + "blender_img" + ".tga";
+    dds_path = f"{tempdir}\\blender_img.dds"
+    tga_path = f"{tempdir}\\blender_img.tga"
     image.file_format = "TARGA_RAW"
     image.filepath_raw = tga_path
     image.save()

@@ -66,7 +66,7 @@ class StreamComponentInfo:
         elif self.Format == 26: return 4
         elif self.Format == 29: return 4
         elif self.Format == 31: return 8
-        raise Exception("Cannot get size of unknown vertex format: "+str(self.Format))
+        raise Exception(f"Cannot get size of unknown vertex format: {self.Format}")
     def SerializeComponent(self, f, value):
         format  = self.FormatName()
         if format == "float":
@@ -113,7 +113,7 @@ class StreamComponentInfo:
             else:
                 return f.vec4_half(value)
         else:
-            raise Exception("Cannot serialize unknown vertex format: "+str(self.Format))
+            raise Exception(f"Cannot serialize unknown vertex format: {self.Format}")
 
 class StreamInfo:
     def __init__(self):
