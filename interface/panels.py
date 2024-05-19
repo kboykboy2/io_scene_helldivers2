@@ -195,8 +195,6 @@ class HellDivers2ToolsPanel(Panel):
         row.prop(scene.Hd2ToolPanelSettings, "ContentsExpanded",
             icon="DOWNARROW_HLT" if scene.Hd2ToolPanelSettings.ContentsExpanded else "RIGHTARROW",
             icon_only=True, emboss=True, text="Archive Contents")
-        # Draw Add Entry Buttons
-        row.operator("helldiver2.material_add", icon='FILE_NEW', text="")
 
         # Get Display Data
         DisplayData = GetDisplayData()
@@ -235,8 +233,10 @@ class HellDivers2ToolsPanel(Panel):
 
                 # Draw Type Header
                 box = layout.box(); row = box.row()
-                row.label(text=GetTypeNameFromID(Type.TypeID)+": "+str(Type.TypeID), icon=type_icon)
+                typeName = GetTypeNameFromID(Type.TypeID)
+                row.label(text=f"{typeName}: {Type.TypeID}", icon=type_icon)
                 row.operator("helldiver2.select_type", icon='RESTRICT_SELECT_OFF', text="").object_typeid = str(Type.TypeID)
+                if typeName == "material": row.operator("helldiver2.material_add", icon='FILE_NEW', text="")
 
                 # Draw Archive Entries
                 col = box.column(align=True)
