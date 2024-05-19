@@ -7,34 +7,34 @@ from .. import globals
 
 def DrawEntryButtonsSimple(box, row, Entry, PatchOnly):
     if Entry.TypeID == globals.MeshID:
-        row.operator("helldiver2.archive_mesh_save", icon='FILE_BLEND', text="").object_id = str(Entry.FileID)
-        row.operator("helldiver2.archive_mesh_import", icon='IMPORT', text="").object_id = str(Entry.FileID)
+        row.operator("helldiver2.archive_mesh_save", icon="FILE_BLEND", text="").object_id = str(Entry.FileID)
+        row.operator("helldiver2.archive_mesh_import", icon="IMPORT", text="").object_id = str(Entry.FileID)
     elif Entry.TypeID == globals.TexID:
-        row.operator("helldiver2.texture_saveblendimage", icon='FILE_BLEND', text="").object_id = str(Entry.FileID)
-        row.operator("helldiver2.texture_import", icon='IMPORT', text="").object_id = str(Entry.FileID)
+        row.operator("helldiver2.texture_saveblendimage", icon="FILE_BLEND", text="").object_id = str(Entry.FileID)
+        row.operator("helldiver2.texture_import", icon="IMPORT", text="").object_id = str(Entry.FileID)
     elif Entry.TypeID == globals.MaterialID:
-        row.operator("helldiver2.material_save", icon='FILE_BLEND', text="").object_id = str(Entry.FileID)
-        row.operator("helldiver2.material_import", icon='IMPORT', text="").object_id = str(Entry.FileID)
+        row.operator("helldiver2.material_save", icon="FILE_BLEND", text="").object_id = str(Entry.FileID)
+        row.operator("helldiver2.material_import", icon="IMPORT", text="").object_id = str(Entry.FileID)
         DrawMaterialEditor(Entry, box, row)
     if globals.TocManager.IsInPatch(Entry):
-        props = row.operator("helldiver2.archive_removefrompatch", icon='FAKE_USER_ON', text="")
+        props = row.operator("helldiver2.archive_removefrompatch", icon="FAKE_USER_ON", text="")
         props.object_id     = str(Entry.FileID)
         props.object_typeid = str(Entry.TypeID)
     else:
-        props = row.operator("helldiver2.archive_addtopatch", icon='FAKE_USER_OFF', text="")
+        props = row.operator("helldiver2.archive_addtopatch", icon="FAKE_USER_OFF", text="")
         props.object_id     = str(Entry.FileID)
         props.object_typeid = str(Entry.TypeID)
     if Entry.IsModified:
-        props = row.operator("helldiver2.archive_undo_mod", icon='TRASH', text="")
+        props = row.operator("helldiver2.archive_undo_mod", icon="TRASH", text="")
         props.object_id     = str(Entry.FileID)
         props.object_typeid = str(Entry.TypeID)
     if PatchOnly:
-        props = row.operator("helldiver2.archive_removefrompatch", icon='X', text="")
+        props = row.operator("helldiver2.archive_removefrompatch", icon="X", text="")
         props.object_id     = str(Entry.FileID)
         props.object_typeid = str(Entry.TypeID)
 
 def DrawMaterialEditor(Entry, layout, row):
-    row.operator("helldiver2.material_showeditor", icon='MOD_LINEART', text="").object_id = str(Entry.FileID)
+    row.operator("helldiver2.material_showeditor", icon="MOD_LINEART", text="").object_id = str(Entry.FileID)
     if Entry.IsLoaded:
         mat = Entry.LoadedData
         if mat.DEV_ShowEditor:
@@ -42,15 +42,15 @@ def DrawMaterialEditor(Entry, layout, row):
                 row = layout.row()
                 row.separator(); row.separator(); row.separator()
                 if mat.DEV_DDSPaths[TexIndex] != None:
-                    row.label(text=mat.DEV_DDSPaths[TexIndex], icon='FILE_IMAGE')
+                    row.label(text=mat.DEV_DDSPaths[TexIndex], icon="FILE_IMAGE")
                 else:
                     textstr = str(mat.TexIDs[TexIndex])
                     if mat.TexIDs[TexIndex] == 14423187101809176546: textstr += ": color"
                     if mat.TexIDs[TexIndex] == 12451968300768537108: textstr += ": sss color"
                     if mat.TexIDs[TexIndex] == 16331558339684530227: textstr += ": pbr"
                     if mat.TexIDs[TexIndex] == 6363549403025827661: textstr += ": normal"
-                    row.label(text=textstr, icon='FILE_IMAGE')
-                props = row.operator("helldiver2.material_settex", icon='FILEBROWSER', text="")
+                    row.label(text=textstr, icon="FILE_IMAGE")
+                props = row.operator("helldiver2.material_settex", icon="FILEBROWSER", text="")
                 props.object_id = str(Entry.FileID)
                 props.tex_idx   = TexIndex
 
@@ -160,35 +160,35 @@ class HellDivers2ToolsPanel(Panel):
 
         # Draw Patch Stuff
         row = layout.row(); row = layout.row(align=True)
-        row.operator("helldiver2.archive_createpatch", icon= 'COLLECTION_NEW', text="New Patch")
-        row.operator("helldiver2.archive_export", icon= 'DISC', text="Write Patch")
+        row.operator("helldiver2.archive_createpatch", icon= "COLLECTION_NEW", text="New Patch")
+        row.operator("helldiver2.archive_export", icon= "DISC", text="Write Patch")
         row = layout.row()
         row.prop(scene.Hd2ToolPanelSettings, "Patches", text="Patches")
         if len(globals.TocManager.Patches) > 0:
             globals.TocManager.SetActivePatchByName(scene.Hd2ToolPanelSettings.Patches)
-        row.operator("helldiver2.archive_import", icon= 'IMPORT', text="").is_patch = True
+        row.operator("helldiver2.archive_import", icon= "IMPORT", text="").is_patch = True
 
         # Draw Archive Import/Export Buttons
         row = layout.row(); row = layout.row(align=True)
-        row.operator("helldiver2.help", icon= 'HELP', text="")
-        row.operator("helldiver2.archive_spreadsheet", icon= 'INFO', text="")
-        row.operator("helldiver2.archive_import", icon= 'IMPORT').is_patch = False
-        row.operator("helldiver2.archive_unloadall", icon= 'FILE_REFRESH', text="")
+        row.operator("helldiver2.help", icon= "HELP", text="")
+        row.operator("helldiver2.archive_spreadsheet", icon= "INFO", text="")
+        row.operator("helldiver2.archive_import", icon= "IMPORT").is_patch = False
+        row.operator("helldiver2.archive_unloadall", icon= "FILE_REFRESH", text="")
         row = layout.row()
         row.prop(scene.Hd2ToolPanelSettings, "LoadedArchives", text="Archives")
-        row.operator("helldiver2.search_archives", icon= 'VIEWZOOM', text="")
+        row.operator("helldiver2.search_archives", icon= "VIEWZOOM", text="")
         row = layout.row()
         if len(globals.TocManager.LoadedArchives) > 0:
             globals.TocManager.SetActiveByName(scene.Hd2ToolPanelSettings.LoadedArchives)
 
         # Draw Search Bar
         row = layout.row(); row = layout.row()
-        row.prop(scene.Hd2ToolPanelSettings, "SearchField", icon='VIEWZOOM', text="")
+        row.prop(scene.Hd2ToolPanelSettings, "SearchField", icon="VIEWZOOM", text="")
         row.prop(scene.Hd2ToolPanelSettings, "PatchOnly", text="")
         # Draw Paste Button
         row = layout.row(align=True)
-        row.operator("helldiver2.archive_paste", icon='PASTEDOWN', text="Paste "+str(len(globals.TocManager.CopyBuffer)))
-        row.operator("helldiver2.archive_clearclipboard", icon='TRASH', text="Clear Clipboard")
+        row.operator("helldiver2.archive_paste", icon="PASTEDOWN", text="Paste "+str(len(globals.TocManager.CopyBuffer)))
+        row.operator("helldiver2.archive_clearclipboard", icon="TRASH", text="Clear Clipboard")
         row = layout.row()
 
         # Draw Archive Contents
@@ -219,15 +219,15 @@ class HellDivers2ToolsPanel(Panel):
                 if not bFound: continue
 
                 # Get Type Icon
-                type_icon = 'FILE'
+                type_icon = "FILE"
                 if Type.TypeID == globals.MeshID:
-                    type_icon = 'FILE_3D'
+                    type_icon = "FILE_3D"
                     if not scene.Hd2ToolPanelSettings.ShowMeshes: continue
                 elif Type.TypeID == globals.TexID:
-                    type_icon = 'FILE_IMAGE'
+                    type_icon = "FILE_IMAGE"
                     if not scene.Hd2ToolPanelSettings.ShowTextures: continue
                 elif Type.TypeID == globals.MaterialID:
-                    type_icon = 'MATERIAL'
+                    type_icon = "MATERIAL"
                     if not scene.Hd2ToolPanelSettings.ShowMaterials: continue
                 elif not scene.Hd2ToolPanelSettings.ShowAllElse: continue
 
@@ -235,8 +235,8 @@ class HellDivers2ToolsPanel(Panel):
                 box = layout.box(); row = box.row()
                 typeName = GetTypeNameFromID(Type.TypeID)
                 row.label(text=f"{typeName}: {Type.TypeID}", icon=type_icon)
-                row.operator("helldiver2.select_type", icon='RESTRICT_SELECT_OFF', text="").object_typeid = str(Type.TypeID)
-                if typeName == "material": row.operator("helldiver2.material_add", icon='FILE_NEW', text="")
+                row.operator("helldiver2.select_type", icon="RESTRICT_SELECT_OFF", text="").object_typeid = str(Type.TypeID)
+                if typeName == "material": row.operator("helldiver2.material_add", icon="FILE_NEW", text="")
 
                 # Draw Archive Entries
                 col = box.column(align=True)

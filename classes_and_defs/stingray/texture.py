@@ -100,7 +100,7 @@ def LoadStingrayTexture(ID, TocData, GpuData, StreamData, Reload, MakeBlendObjec
         tempdir = tempfile.gettempdir()
         path = tempdir + "\\" + str(ID) + ".dds";
         tga_path = tempdir + "\\" + str(ID) + ".tga";
-        with open(path, 'w+b') as f:
+        with open(path, "w+b") as f:
             f.write(dds)
 
         # convert to dds, as blender does not support these version of dds
@@ -127,7 +127,7 @@ def BlendImageToStingrayTexture(image, StingrayTex):
     tempdir  = tempfile.gettempdir()
     dds_path = tempdir + "\\" + "blender_img" + ".dds";
     tga_path = tempdir + "\\" + "blender_img" + ".tga";
-    image.file_format = 'TARGA_RAW'
+    image.file_format = "TARGA_RAW"
     image.filepath_raw = tga_path
     image.save()
     command = f"\"{globals.TexconvPath}\" \"{tga_path}\" -ft dds -dx10 -f {StingrayTex.Format} -o \"{tempdir}\""
@@ -139,7 +139,7 @@ def BlendImageToStingrayTexture(image, StingrayTex):
         if os.path.isfile(dds_path):
             break
     if os.path.isfile(dds_path):
-        with open(dds_path, 'r+b') as f:
+        with open(dds_path, "r+b") as f:
             StingrayTex.FromDDs(f.read())
         os.remove(tga_path)
         os.remove(dds_path)

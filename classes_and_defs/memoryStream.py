@@ -63,27 +63,27 @@ class MemoryStream:
             return value
 
     def int8(self, value):
-        return self.serialize(value, 'b', 1)
+        return self.serialize(value, "b", 1)
     def uint8(self, value):
-        return self.serialize(value, 'B', 1)
+        return self.serialize(value, "B", 1)
     def int16(self, value):
-        return self.serialize(value, 'h', 2)
+        return self.serialize(value, "h", 2)
     def uint16(self, value):
-        return self.serialize(value, 'H', 2)
+        return self.serialize(value, "H", 2)
     def int32(self, value):
-        return self.serialize(value, 'i', 4)
+        return self.serialize(value, "i", 4)
     def uint32(self, value):
-        return self.serialize(value, 'I', 4)
+        return self.serialize(value, "I", 4)
     def int64(self, value):
-        return self.serialize(value, 'q', 8)
+        return self.serialize(value, "q", 8)
     def uint64(self, value):
-        return self.serialize(value, 'Q', 8)
+        return self.serialize(value, "Q", 8)
     def float16(self, value):
-        return self.serialize(value, 'e', 2)
+        return self.serialize(value, "e", 2)
     def float32(self, value):
-        return self.serialize(value, 'f', 4)
+        return self.serialize(value, "f", 4)
     def float64(self, value):
-        return self.serialize(value, 'd', 8)
+        return self.serialize(value, "d", 8)
     def __resize_vec(self, value, length):
         value = list(value)
         if len(value) < length:

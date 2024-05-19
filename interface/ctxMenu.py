@@ -60,68 +60,68 @@ def DrawEntryButtons(row, Entry):
 
     # Draw copy button
     row.separator()
-    props = row.operator("helldiver2.archive_copy", icon='COPYDOWN', text=CopyName)
+    props = row.operator("helldiver2.archive_copy", icon="COPYDOWN", text=CopyName)
     props.object_id     = FileIDStr
     props.object_typeid = TypeIDStr
     if SingleEntry:
-        props = row.operator("helldiver2.archive_duplicate", icon='DUPLICATE', text="Duplicate Entry")
+        props = row.operator("helldiver2.archive_duplicate", icon="DUPLICATE", text="Duplicate Entry")
         props.object_id     = str(Entry.FileID)
         props.object_typeid = str(Entry.TypeID)
     if globals.TocManager.IsInPatch(Entry):
-        props = row.operator("helldiver2.archive_removefrompatch", icon='X', text=RemoveFromPatchName)
+        props = row.operator("helldiver2.archive_removefrompatch", icon="X", text=RemoveFromPatchName)
         props.object_id     = FileIDStr
         props.object_typeid = TypeIDStr
     else:
-        props = row.operator("helldiver2.archive_addtopatch", icon='PLUS', text=AddToPatchName)
+        props = row.operator("helldiver2.archive_addtopatch", icon="PLUS", text=AddToPatchName)
         props.object_id     = FileIDStr
         props.object_typeid = TypeIDStr
 
     # Draw import buttons
     # TODO: Add generic import buttons
     row.separator()
-    if   AreAllMeshes   : row.operator("helldiver2.archive_mesh_import", icon='IMPORT', text=ImportMeshName).object_id = FileIDStr
-    elif AreAllTextures : row.operator("helldiver2.texture_import", icon='IMPORT', text=ImportTextureName).object_id = FileIDStr
-    elif AreAllMaterials: row.operator("helldiver2.material_import", icon='IMPORT', text=ImportMaterialName).object_id = FileIDStr
+    if   AreAllMeshes   : row.operator("helldiver2.archive_mesh_import", icon="IMPORT", text=ImportMeshName).object_id = FileIDStr
+    elif AreAllTextures : row.operator("helldiver2.texture_import", icon="IMPORT", text=ImportTextureName).object_id = FileIDStr
+    elif AreAllMaterials: row.operator("helldiver2.material_import", icon="IMPORT", text=ImportMaterialName).object_id = FileIDStr
     # Draw export buttons
     row.separator()
     if AreAllTextures:
         if SingleEntry:
-            row.operator("helldiver2.texture_export", icon='EXPORT', text="Export Texture").object_id = str(Entry.FileID)
+            row.operator("helldiver2.texture_export", icon="EXPORT", text="Export Texture").object_id = str(Entry.FileID)
         else:
-            row.operator("helldiver2.texture_batchexport", icon='EXPORT', text=f"Export {NumSelected} Textures").object_id = FileIDStr
-    props = row.operator("helldiver2.archive_object_dump", icon='PACKAGE', text=DumpObjectName)
+            row.operator("helldiver2.texture_batchexport", icon="EXPORT", text=f"Export {NumSelected} Textures").object_id = FileIDStr
+    props = row.operator("helldiver2.archive_object_dump", icon="PACKAGE", text=DumpObjectName)
     props.object_id     = FileIDStr
     props.object_typeid = TypeIDStr
     # Draw save buttons
     row.separator()
     if AreAllMeshes:
         if SingleEntry:
-            row.operator("helldiver2.archive_mesh_save", icon='FILE_BLEND', text="Save Mesh").object_id = str(Entry.FileID)
+            row.operator("helldiver2.archive_mesh_save", icon="FILE_BLEND", text="Save Mesh").object_id = str(Entry.FileID)
         else:
-            row.operator("helldiver2.archive_mesh_batchsave", icon='FILE_BLEND', text=f"Save {NumSelected} Meshes")
+            row.operator("helldiver2.archive_mesh_batchsave", icon="FILE_BLEND", text=f"Save {NumSelected} Meshes")
     elif AreAllTextures:
-        row.operator("helldiver2.texture_saveblendimage", icon='FILE_BLEND', text=SaveTextureName).object_id = FileIDStr
+        row.operator("helldiver2.texture_saveblendimage", icon="FILE_BLEND", text=SaveTextureName).object_id = FileIDStr
         if SingleEntry:
-            row.operator("helldiver2.texture_savefromdds", icon='IMAGE_REFERENCE', text="Save Texture From DDs").object_id = str(Entry.FileID)
-    elif AreAllMaterials: row.operator("helldiver2.material_save", icon='FILE_BLEND', text=SaveMaterialName).object_id = FileIDStr
+            row.operator("helldiver2.texture_savefromdds", icon="IMAGE_REFERENCE", text="Save Texture From DDs").object_id = str(Entry.FileID)
+    elif AreAllMaterials: row.operator("helldiver2.material_save", icon="FILE_BLEND", text=SaveMaterialName).object_id = FileIDStr
     # Draw copy ID buttons
     if SingleEntry:
         row.separator()
-        row.operator("helldiver2.copytest", icon='COPY_ID', text="Copy Entry ID").text = str(Entry.FileID)
-        row.operator("helldiver2.copytest", icon='COPY_ID', text="Copy Type ID").text  = str(Entry.TypeID)
-        row.operator("helldiver2.copytest", icon='COPY_ID', text="Copy Friendly Name").text  = GetFriendlyNameFromID(Entry.FileID)
+        row.operator("helldiver2.copytest", icon="COPY_ID", text="Copy Entry ID").text = str(Entry.FileID)
+        row.operator("helldiver2.copytest", icon="COPY_ID", text="Copy Type ID").text  = str(Entry.TypeID)
+        row.operator("helldiver2.copytest", icon="COPY_ID", text="Copy Friendly Name").text  = GetFriendlyNameFromID(Entry.FileID)
         if globals.TocManager.IsInPatch(Entry):
-            props = row.operator("helldiver2.archive_entryrename", icon='TEXT', text="Rename")
+            props = row.operator("helldiver2.archive_entryrename", icon="TEXT", text="Rename")
             props.object_id     = str(Entry.FileID)
             props.object_typeid = str(Entry.TypeID)
     if Entry.IsModified:
         row.separator()
-        props = row.operator("helldiver2.archive_undo_mod", icon='TRASH', text=UndoName)
+        props = row.operator("helldiver2.archive_undo_mod", icon="TRASH", text=UndoName)
         props.object_id     = FileIDStr
         props.object_typeid = TypeIDStr
 
     if SingleEntry:
-        row.operator("helldiver2.archive_setfriendlyname", icon='WORDWRAP_ON', text="Set Friendly Name").object_id = str(Entry.FileID)
+        row.operator("helldiver2.archive_setfriendlyname", icon="WORDWRAP_ON", text="Set Friendly Name").object_id = str(Entry.FileID)
 
     return
 

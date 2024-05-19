@@ -22,16 +22,16 @@ def duplicate(obj, data=True, actions=True, collection=None):
 
 def PrepareMesh(og_object):
     object = duplicate(og_object)
-    bpy.ops.object.select_all(action='DESELECT')
+    bpy.ops.object.select_all(action="DESELECT")
     bpy.context.view_layer.objects.active = object
     # split UV seams
     try:
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.uv.select_all(action='SELECT')
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.uv.select_all(action="SELECT")
         bpy.ops.uv.seams_from_islands()
     except: print("Error attempting to create seams from uv islands")
-    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.ops.object.mode_set(mode="OBJECT")
 
     bm = bmesh.new()
     bm.from_mesh(object.data)
@@ -46,22 +46,22 @@ def PrepareMesh(og_object):
     bm.to_mesh(object.data)
     bm.clear()
     # transfer normals
-    modifier = object.modifiers.new("EXPORT_NORMAL_TRANSFER", 'DATA_TRANSFER')
-    bpy.context.object.modifiers[modifier.name].data_types_loops = {'CUSTOM_NORMAL'}
+    modifier = object.modifiers.new("EXPORT_NORMAL_TRANSFER", "DATA_TRANSFER")
+    bpy.context.object.modifiers[modifier.name].data_types_loops = {"CUSTOM_NORMAL"}
     bpy.context.object.modifiers[modifier.name].object = og_object
     bpy.context.object.modifiers[modifier.name].use_loop_data = True
-    bpy.context.object.modifiers[modifier.name].loop_mapping = 'TOPOLOGY'
+    bpy.context.object.modifiers[modifier.name].loop_mapping = "TOPOLOGY"
     bpy.ops.object.modifier_apply(modifier=modifier.name)
     # triangulate
-    modifier = object.modifiers.new("EXPORT_TRIANGULATE", 'TRIANGULATE')
+    modifier = object.modifiers.new("EXPORT_TRIANGULATE", "TRIANGULATE")
     bpy.context.object.modifiers[modifier.name].keep_custom_normals = True
     bpy.ops.object.modifier_apply(modifier=modifier.name)
 
     # adjust weights
-    bpy.ops.object.mode_set(mode='WEIGHT_PAINT')
+    bpy.ops.object.mode_set(mode="WEIGHT_PAINT")
     try:
         bpy.ops.object.vertex_group_normalize_all(lock_active=False)
-        bpy.ops.object.vertex_group_limit_total(group_select_mode='ALL', limit=4)
+        bpy.ops.object.vertex_group_limit_total(group_select_mode="ALL", limit=4)
     except: pass
 
     return object
@@ -172,7 +172,7 @@ def GetMeshData(og_object):
 
 def GetObjectsMeshData():
     objects = bpy.context.selected_objects
-    bpy.ops.object.select_all(action='DESELECT')
+    bpy.ops.object.select_all(action="DESELECT")
     data = []
     for object in objects:
         data.append(GetMeshData(object))
@@ -242,7 +242,7 @@ def CreateModel(model, id, customization_info, bone_names):
         # TODO: fix incorrect rotation
         rot = mesh.DEV_Transform.rot
         rotation_matrix = mathutils.Matrix([rot.x, rot.y, rot.z])
-        new_object.rotation_mode = 'QUATERNION'
+        new_object.rotation_mode = "QUATERNION"
         new_object.rotation_quaternion = rotation_matrix.to_quaternion()
 
         # set object properties
@@ -255,14 +255,14 @@ def CreateModel(model, id, customization_info, bone_names):
             new_object["Z_CustomizationWeight"]   = customization_info.Weight
             new_object["Z_CustomizationPieceType"]= customization_info.PieceType
         if mesh.IsPhysicsBody():
-            new_object.display_type = 'WIRE'
+            new_object.display_type = "WIRE"
 
         # add object to scene collection
         new_collection.objects.link(new_object)
         # -- || ASSIGN NORMALS || -- #
         if len(mesh.VertexNormals) == len(mesh.VertexPositions):
             new_mesh.use_auto_smooth = True
-            new_mesh.polygons.foreach_set('use_smooth',  [True] * len(new_mesh.polygons))
+            new_mesh.polygons.foreach_set("use_smooth",  [True] * len(new_mesh.polygons))
             if not isinstance(mesh.VertexNormals[0], int):
                 new_mesh.normals_split_custom_set_from_vertices(mesh.VertexNormals)
 
@@ -299,7 +299,7 @@ def CreateModel(model, id, customization_info, bone_names):
                         created_groups.append(group_name)
                         new_vertex_group = new_object.vertex_groups.new(name=str(group_name))
                     vertex_group_data = [vertex_idx]
-                    new_object.vertex_groups[str(group_name)].add(vertex_group_data, weight_value, 'ADD')
+                    new_object.vertex_groups[str(group_name)].add(vertex_group_data, weight_value, "ADD")
                 group_index += 1
         # -- || ASSIGN MATERIALS || -- #
         # convert mesh to bmesh
@@ -326,7 +326,7 @@ def CreateModel(model, id, customization_info, bone_names):
             if mesh.DEV_BoneInfo != None:
                 for Bone in mesh.DEV_BoneInfo.Bones:
                     current_pos = [Bone.v[12], Bone.v[13], Bone.v[14]]
-                    bpy.ops.object.empty_add(type='SPHERE', radius=0.08, align='WORLD', location=(current_pos[0], current_pos[1], current_pos[2]), scale=(1, 1, 1))
+                    bpy.ops.object.empty_add(type="SPHERE", radius=0.08, align="WORLD", location=(current_pos[0], current_pos[1], current_pos[2]), scale=(1, 1, 1))
 
 class TransformInfo: # READ ONLY
     def __init__(self):

@@ -13,8 +13,8 @@ from ..utils.hash import AddFriendlyName, GetTypeNameFromID, Hash64
 from .. import globals
 
 def EntriesFromStrings(file_id_string, type_id_string):
-    FileIDs = file_id_string.split(',')
-    TypeIDs = type_id_string.split(',')
+    FileIDs = file_id_string.split(",")
+    TypeIDs = type_id_string.split(",")
     Entries = []
     for n in range(len(FileIDs)):
         if FileIDs[n] != "":
@@ -22,7 +22,7 @@ def EntriesFromStrings(file_id_string, type_id_string):
     return Entries
 
 def EntriesFromString(file_id_string, TypeID):
-    FileIDs = file_id_string.split(',')
+    FileIDs = file_id_string.split(",")
     Entries = []
     for n in range(len(FileIDs)):
         if FileIDs[n] != "":
@@ -30,7 +30,7 @@ def EntriesFromString(file_id_string, TypeID):
     return Entries
 
 def IDsFromString(file_id_string):
-    FileIDs = file_id_string.split(',')
+    FileIDs = file_id_string.split(",")
     Entries = []
     for n in range(len(FileIDs)):
         if FileIDs[n] != "":
@@ -42,13 +42,13 @@ class LoadArchiveOperator(Operator, ImportHelper):
     bl_label = "Load Archive"
     bl_idname = "helldiver2.archive_import"
     filter_glob: StringProperty(
-    default='*',
-    options={'HIDDEN'}
+    default="*",
+    options={"HIDDEN"}
     )
     is_patch: BoolProperty(name="is_patch", default=False)
     def execute(self, context):
         globals.TocManager.LoadArchive(self.filepath, True, self.is_patch)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # load archive button
 class LoadArchivesOperator(Operator):
@@ -57,12 +57,12 @@ class LoadArchivesOperator(Operator):
 
     paths_str: StringProperty(name="paths_str")
     def execute(self, context):
-        paths = self.paths_str.split(',')
+        paths = self.paths_str.split(",")
         for path in paths:
             if path != "" and os.path.exists(path):
                 globals.TocManager.LoadArchive(path)
         self.paths = []
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # patch archive button
 class PatchArchiveOperator(Operator):
@@ -71,7 +71,7 @@ class PatchArchiveOperator(Operator):
 
     def execute(self, context):
         globals.TocManager.PatchActiveArchive()
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # dump archive entry button
 class DumpArchiveObjectOperator(Operator, ExportHelper):
@@ -90,19 +90,19 @@ class DumpArchiveObjectOperator(Operator, ExportHelper):
             if Entry != None:
                 data = Entry.GetData()
                 FileName = str(Entry.FileID)+"."+GetTypeNameFromID(Entry.TypeID)
-                with open(self.directory + FileName, 'w+b') as f:
+                with open(self.directory + FileName, "w+b") as f:
                     f.write(data[0])
                 if data[1] != b"":
-                    with open(self.directory + FileName+".gpu", 'w+b') as f:
+                    with open(self.directory + FileName+".gpu", "w+b") as f:
                         f.write(data[1])
                 if data[2] != b"":
-                    with open(self.directory + FileName+".stream", 'w+b') as f:
+                    with open(self.directory + FileName+".stream", "w+b") as f:
                         f.write(data[2])
-        return{'FINISHED'}
+        return{"FINISHED"}
 
     def invoke(self, context, event):
         context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
+        return {"RUNNING_MODAL"}
 
 # undo modified archive entry
 class UndoArchiveEntryModOperator(Operator):
@@ -116,7 +116,7 @@ class UndoArchiveEntryModOperator(Operator):
         for Entry in Entries:
             if Entry != None:
                 Entry.UndoModifiedData()
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # copy entry
 class CopyArchiveEntryOperator(Operator):
@@ -128,7 +128,7 @@ class CopyArchiveEntryOperator(Operator):
     def execute(self, context):
         Entries = EntriesFromStrings(self.object_id, self.object_typeid)
         globals.TocManager.Copy(Entries)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # paste entry
 class PasteArchiveEntryOperator(Operator):
@@ -139,7 +139,7 @@ class PasteArchiveEntryOperator(Operator):
     object_typeid: StringProperty()
     def execute(self, context):
         globals.TocManager.Paste()
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # clear clipboard
 class ClearClipboardOperator(Operator):
@@ -148,7 +148,7 @@ class ClearClipboardOperator(Operator):
 
     def execute(self, context):
         globals.TocManager.ClearClipboard()
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # unload all archives
 class UnloadArchivesOperator(Operator):
@@ -157,7 +157,7 @@ class UnloadArchivesOperator(Operator):
 
     def execute(self, context):
         globals.TocManager.UnloadArchives()
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # create patch
 class CreatePatchFromActiveOperator(Operator):
@@ -166,7 +166,7 @@ class CreatePatchFromActiveOperator(Operator):
 
     def execute(self, context):
         globals.TocManager.CreatePatchFromActive()
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # add entry to patch
 class AddEntryToPatchOperator(Operator):
@@ -179,7 +179,7 @@ class AddEntryToPatchOperator(Operator):
         Entries = EntriesFromStrings(self.object_id, self.object_typeid)
         for Entry in Entries:
             globals.TocManager.AddEntryToPatch(Entry.FileID, Entry.TypeID)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # remove entry from patch
 class RemoveEntryFromPatchOperator(Operator):
@@ -192,7 +192,7 @@ class RemoveEntryFromPatchOperator(Operator):
         Entries = EntriesFromStrings(self.object_id, self.object_typeid)
         for Entry in Entries:
             globals.TocManager.RemoveEntryFromPatch(Entry.FileID, Entry.TypeID)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # rename entry in patch
 class RenamePatchEntryOperator(Operator):
@@ -202,7 +202,7 @@ class RenamePatchEntryOperator(Operator):
     NewFileID : StringProperty(name="NewFileID", default="")
     def draw(self, context):
         layout = self.layout; row = layout.row()
-        row.prop(self, "NewFileID", icon='COPY_ID')
+        row.prop(self, "NewFileID", icon="COPY_ID")
 
     object_id: StringProperty()
     object_typeid: StringProperty()
@@ -212,7 +212,7 @@ class RenamePatchEntryOperator(Operator):
             raise Exception("Entry does not exist in patch (cannot rename non patch entries)")
         if Entry != None and self.NewFileID != "":
             Entry.FileID = int(self.NewFileID)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
     def invoke(self, context, event):
         wm = context.window_manager
@@ -226,13 +226,13 @@ class DuplicateEntryOperator(Operator):
     NewFileID : StringProperty(name="NewFileID", default="")
     def draw(self, context):
         layout = self.layout; row = layout.row()
-        row.prop(self, "NewFileID", icon='COPY_ID')
+        row.prop(self, "NewFileID", icon="COPY_ID")
 
     object_id: StringProperty()
     object_typeid: StringProperty()
     def execute(self, context):
         globals.TocManager.DuplicateEntry(int(self.object_id), int(self.object_typeid), int(self.NewFileID))
-        return{'FINISHED'}
+        return{"FINISHED"}
 
     def invoke(self, context, event):
         wm = context.window_manager
@@ -246,7 +246,7 @@ class SetEntryFriendlyNameOperator(Operator):
     NewFriendlyName : StringProperty(name="NewFriendlyName", default="")
     def draw(self, context):
         layout = self.layout; row = layout.row()
-        row.prop(self, "NewFriendlyName", icon='COPY_ID')
+        row.prop(self, "NewFriendlyName", icon="COPY_ID")
         row = layout.row()
         if Hash64(str(self.NewFriendlyName)) == int(self.object_id):
             row.label(text="Hash is correct")
@@ -257,7 +257,7 @@ class SetEntryFriendlyNameOperator(Operator):
     object_id: StringProperty()
     def execute(self, context):
         AddFriendlyName(int(self.object_id), str(self.NewFriendlyName))
-        return{'FINISHED'}
+        return{"FINISHED"}
 
     def invoke(self, context, event):
         wm = context.window_manager
@@ -272,7 +272,7 @@ class ImportMaterialOperator(Operator):
         EntriesIDs = IDsFromString(self.object_id)
         for EntryID in EntriesIDs:
             globals.TocManager.Load(int(EntryID), globals.MaterialID)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 class AddMaterialOperator(Operator):
     bl_label = "Add Material"
@@ -283,13 +283,13 @@ class AddMaterialOperator(Operator):
         Entry.FileID = r.randint(1, 0xffffffffffffffff)
         Entry.TypeID = globals.MaterialID
         Entry.IsCreated = True
-        with open(globals.DefaultMaterialPath, 'r+b') as f:
+        with open(globals.DefaultMaterialPath, "r+b") as f:
             data = f.read()
         Entry.TocData_OLD   = data
         Entry.TocData       = data
 
         globals.TocManager.AddNewEntryToPatch(Entry)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 class SaveMaterialOperator(Operator):
     bl_label = "Save Material"
@@ -300,7 +300,7 @@ class SaveMaterialOperator(Operator):
         EntriesIDs = IDsFromString(self.object_id)
         for EntryID in EntriesIDs:
             globals.TocManager.Save(int(EntryID), globals.MaterialID)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 class ShowMaterialEditorOperator(Operator):
     bl_label = "Show Material Editor"
@@ -318,7 +318,7 @@ class ShowMaterialEditorOperator(Operator):
             else:
                 print("MakeTrue")
                 mat.DEV_ShowEditor = True
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 class SetMaterialTexture(Operator, ImportHelper):
     bl_label = "Set Material Texture"
@@ -334,7 +334,7 @@ class SetMaterialTexture(Operator, ImportHelper):
         if Entry != None:
             if Entry.IsLoaded:
                 Entry.LoadedData.DEV_DDSPaths[self.tex_idx] = self.filepath
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # import texture from archive button
 class ImportTextureOperator(Operator):
@@ -346,7 +346,7 @@ class ImportTextureOperator(Operator):
         EntriesIDs = IDsFromString(self.object_id)
         for EntryID in EntriesIDs:
             globals.TocManager.Load(int(EntryID), globals.TexID)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # batch export texture to file
 class BatchExportTextureOperator(Operator):
@@ -364,13 +364,13 @@ class BatchExportTextureOperator(Operator):
             Entry = globals.TocManager.GetEntry(EntryID, globals.TexID)
             if Entry != None:
                 data = Entry.Load(False, False)
-                with open(self.directory + str(Entry.FileID)+".dds", 'w+b') as f:
+                with open(self.directory + str(Entry.FileID)+".dds", "w+b") as f:
                     f.write(Entry.LoadedData.ToDDs())
-        return{'FINISHED'}
+        return{"FINISHED"}
 
     def invoke(self, context, event):
         context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
+        return {"RUNNING_MODAL"}
 
 # export texture to file
 class ExportTextureOperator(Operator, ExportHelper):
@@ -383,9 +383,9 @@ class ExportTextureOperator(Operator, ExportHelper):
         Entry = globals.TocManager.GetEntry(int(self.object_id), globals.TexID)
         if Entry != None:
             data = Entry.Load(False, False)
-            with open(self.filepath, 'w+b') as f:
+            with open(self.filepath, "w+b") as f:
                 f.write(Entry.LoadedData.ToDDs())
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # save texture from blender to archive button
 class SaveTextureFromBlendImageOperator(Operator):
@@ -403,7 +403,7 @@ class SaveTextureFromBlendImageOperator(Operator):
                 except: print("Saving Texture, but no blend texture was found, using original"); pass
                 # TODO: allow the user to choose an image, instead of looking for one of the same name
             globals.TocManager.Save(Entry.FileID, globals.TexID)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # import texture from archive button
 class SaveTextureFromDDsOperator(Operator, ImportHelper):
@@ -418,7 +418,7 @@ class SaveTextureFromDDsOperator(Operator, ImportHelper):
                 # get texture data
                 Entry.Load()
                 StingrayTex = Entry.LoadedData
-                with open(self.filepath, 'r+b') as f:
+                with open(self.filepath, "r+b") as f:
                     StingrayTex.FromDDs(f.read())
                 Toc = MemoryStream(IOMode="write")
                 Gpu = MemoryStream(IOMode="write")
@@ -428,7 +428,7 @@ class SaveTextureFromDDsOperator(Operator, ImportHelper):
                 Entry.SetData(Toc.Data, Gpu.Data, Stream.Data, False)
 
                 globals.TocManager.Save(int(self.object_id), globals.TexID)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # import mesh from archive button
 class ImportStingrayMeshOperator(Operator):
@@ -456,7 +456,7 @@ class ImportStingrayMeshOperator(Operator):
                 print(f"    {error[1]}\n")
                 idx += 1
             raise Exception("One or more meshes failed to load")
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # save mesh to archive button
 class SaveStingrayMeshOperator(Operator):
@@ -466,7 +466,7 @@ class SaveStingrayMeshOperator(Operator):
     object_id: StringProperty()
     def execute(self, context):
         globals.TocManager.Save(int(self.object_id), globals.MeshID)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # batch save mesh to archive button
 class BatchSaveStingrayMeshOperator(Operator):
@@ -475,7 +475,7 @@ class BatchSaveStingrayMeshOperator(Operator):
 
     def execute(self, context):
         objects = bpy.context.selected_objects
-        bpy.ops.object.select_all(action='DESELECT')
+        bpy.ops.object.select_all(action="DESELECT")
         IDs = []
         for object in objects:
             try:
@@ -492,7 +492,7 @@ class BatchSaveStingrayMeshOperator(Operator):
                 except: pass
 
             globals.TocManager.Save(int(ID), globals.MeshID)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 class SearchArchivesOperator(Operator):
     bl_label = "Search All Archives"
@@ -502,7 +502,7 @@ class SearchArchivesOperator(Operator):
     def draw(self, context):
         layout = self.layout
         row = layout.row()
-        row.prop(self, "SearchField", icon='VIEWZOOM')
+        row.prop(self, "SearchField", icon="VIEWZOOM")
         # Update displayed archives
         if self.PrevSearch != self.SearchField:
             self.PrevSearch = self.SearchField
@@ -544,14 +544,14 @@ class SearchArchivesOperator(Operator):
                 paths_str += Archive[0].Path + ","
 
             row = layout.row()
-            row.operator("helldiver2.archives_import", icon= 'FILE_NEW').paths_str = paths_str
+            row.operator("helldiver2.archives_import", icon= "FILE_NEW").paths_str = paths_str
         # Draw Display Archives
         for Archive in self.ArchivesToDisplay:
             row = layout.row()
-            row.label(text=Archive[1], icon='FILE_ARCHIVE')
-            row.operator("helldiver2.archives_import", icon= 'FILE_NEW', text="").paths_str = Archive[0].Path
+            row.label(text=Archive[1], icon="FILE_ARCHIVE")
+            row.operator("helldiver2.archives_import", icon= "FILE_NEW", text="").paths_str = Archive[0].Path
     def execute(self, context):
-        return {'FINISHED'}
+        return {"FINISHED"}
 
     def invoke(self, context, event):
         self.PrevSearch = "NONE"
@@ -577,7 +577,7 @@ class SelectAllOfTypeOperator(Operator):
                     pass
                 else:
                     globals.TocManager.SelectEntries([Entry], True)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # Copy Text
 class CopyTextOperator(Operator):
@@ -586,9 +586,9 @@ class CopyTextOperator(Operator):
 
     text: StringProperty()
     def execute(self, context):
-        cmd='echo '+str(self.text).strip()+'|clip'
+        cmd="echo "+str(self.text).strip()+"|clip"
         subprocess.check_call(cmd, shell=True)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # Open documentation
 class HelpOperator(Operator):
@@ -598,7 +598,7 @@ class HelpOperator(Operator):
     def execute(self, context):
         url = "https://docs.google.com/document/d/1SF7iEekmxoDdf0EsJu1ww9u2Cr8vzHyn2ycZS7JlWl0/edit#heading=h.gv4shgb4on0i"
         webbrowser.open(url, new=0, autoraise=True)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 # Open Archive Spreadsheet
 class ArchiveSpreadsheetOperator(Operator):
@@ -608,7 +608,7 @@ class ArchiveSpreadsheetOperator(Operator):
     def execute(self, context):
         url = "https://docs.google.com/spreadsheets/d/1oQys_OI5DWou4GeRE3mW56j7BIi4M7KftBIPAl1ULFw"
         webbrowser.open(url, new=0, autoraise=True)
-        return{'FINISHED'}
+        return{"FINISHED"}
 
 class ArchiveEntryOperator(Operator):
     bl_label  = "Archive Entry"
@@ -617,7 +617,7 @@ class ArchiveEntryOperator(Operator):
     object_id: StringProperty()
     object_typeid: StringProperty()
     def execute(self, context):
-        return{'FINISHED'}
+        return{"FINISHED"}
 
     def invoke(self, context, event):
         Entry = globals.TocManager.GetEntry(int(self.object_id), int(self.object_typeid))
@@ -626,7 +626,7 @@ class ArchiveEntryOperator(Operator):
                 globals.TocManager.DeselectEntries([Entry])
             else:
                 globals.TocManager.SelectEntries([Entry], True)
-            return {'FINISHED'}
+            return {"FINISHED"}
         if event.shift:
             if globals.TocManager.LastSelected != None:
                 LastSelected = globals.TocManager.LastSelected
@@ -640,7 +640,7 @@ class ArchiveEntryOperator(Operator):
                     globals.TocManager.SelectEntries(globals.TocManager.DrawChain[StartIndex:EndIndex+1], True)
             else:
                 globals.TocManager.SelectEntries([Entry], True)
-            return {'FINISHED'}
+            return {"FINISHED"}
 
         globals.TocManager.SelectEntries([Entry])
-        return {'FINISHED'}
+        return {"FINISHED"}

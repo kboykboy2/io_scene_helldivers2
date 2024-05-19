@@ -18,7 +18,7 @@ def Hash64(string):
     return F.uint64(0)
 
 def LoadTypeHashes():
-    with open(globals.TypeHashPath, 'r') as f:
+    with open(globals.TypeHashPath, "r") as f:
         for line in f.readlines():
             parts = line.split(" ")
             globals.TypeHashes.append([int(parts[0], 16), parts[1].replace("\n", "")])
@@ -37,12 +37,12 @@ def GetIDFromTypeName(Name):
 
 def LoadNameHashes():
     Loaded = []
-    with open(globals.FileHashPath, 'r') as f:
+    with open(globals.FileHashPath, "r") as f:
         for line in f.readlines():
             parts = line.split(" ")
             globals.NameHashes.append([int(parts[0]), parts[1].replace("\n", "")])
             Loaded.append(int(parts[0]))
-    with open(globals.FriendlyNamesPath, 'r') as f:
+    with open(globals.FriendlyNamesPath, "r") as f:
         for line in f.readlines():
             parts = line.split(" ")
             if int(parts[0]) not in Loaded:
@@ -63,12 +63,12 @@ def HasFriendlyName(ID):
     return False
 
 def SaveFriendlyNames():
-    with open(globals.FileHashPath, 'w') as f:
+    with open(globals.FileHashPath, "w") as f:
         for hash_info in globals.NameHashes:
             if hash_info[1] != "" and int(hash_info[0]) == Hash64(hash_info[1]):
                 string = str(hash_info[0]) + " " + str(hash_info[1])
                 f.writelines(string+"\n")
-    with open(globals.FriendlyNamesPath, 'w') as f:
+    with open(globals.FriendlyNamesPath, "w") as f:
         for hash_info in globals.NameHashes:
             if hash_info[1] != "":
                 string = str(hash_info[0]) + " " + str(hash_info[1])

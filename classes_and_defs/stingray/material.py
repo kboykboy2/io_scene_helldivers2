@@ -80,7 +80,7 @@ def SaveStingrayMaterial(ID, TocData, GpuData, StreamData, LoadedData):
         if mat.DEV_DDSPaths[TexIdx] != None:
             # get texture data
             StingrayTex = StingrayTexture()
-            with open(mat.DEV_DDSPaths[TexIdx], 'r+b') as f:
+            with open(mat.DEV_DDSPaths[TexIdx], "r+b") as f:
                 StingrayTex.FromDDs(f.read())
             Toc = MemoryStream(IOMode="write")
             Gpu = MemoryStream(IOMode="write")
@@ -120,7 +120,7 @@ def AddMaterialToBlend(ID, StringrayMat, EmptyMatExists=False):
     idx = 0
     for TextureID in StringrayMat.TexIDs:
         # Create Node
-        texImage = mat.node_tree.nodes.new('ShaderNodeTexImage')
+        texImage = mat.node_tree.nodes.new("ShaderNodeTexImage")
         texImage.location = (-450, 850 - 300*idx)
 
         # Load Texture

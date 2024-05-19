@@ -42,7 +42,7 @@ def NormalsFromPalette(normals):
 def LoadNormalPalette_py():
     if len(globals.NormalPalette) > 0:
         return
-    with open(globals.PalettePath, 'r+b') as f:
+    with open(globals.PalettePath, "r+b") as f:
         data = f.read()
     f = MemoryStream(data, IOMode="read")
     num = f.uint32(0)

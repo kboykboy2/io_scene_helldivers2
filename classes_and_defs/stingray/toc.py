@@ -200,17 +200,17 @@ class StreamToc:
 
     def FromFile(self, path, SerializeData=True):
         self.UpdatePath(path)
-        with open(path, 'r+b') as f:
+        with open(path, "r+b") as f:
             self.TocFile = MemoryStream(f.read())
 
         self.GpuFile    = MemoryStream()
         self.StreamFile = MemoryStream()
         if SerializeData:
             if os.path.isfile(path+".gpu_resources"):
-                with open(path+".gpu_resources", 'r+b') as f:
+                with open(path+".gpu_resources", "r+b") as f:
                     self.GpuFile = MemoryStream(f.read())
             if os.path.isfile(path+".stream"):
-                with open(path+".stream", 'r+b') as f:
+                with open(path+".stream", "r+b") as f:
                     self.StreamFile = MemoryStream(f.read())
         return self.Serialize(SerializeData)
 
@@ -221,11 +221,11 @@ class StreamToc:
         self.Serialize()
         if path == None: path = self.Path
 
-        with open(path, 'w+b') as f:
+        with open(path, "w+b") as f:
             f.write(bytes(self.TocFile.Data))
-        with open(path+".gpu_resources", 'w+b') as f:
+        with open(path+".gpu_resources", "w+b") as f:
             f.write(bytes(self.GpuFile.Data))
-        with open(path+".stream", 'w+b') as f:
+        with open(path+".stream", "w+b") as f:
             f.write(bytes(self.StreamFile.Data))
 
     def GetFileData(self, FileID, TypeID):
