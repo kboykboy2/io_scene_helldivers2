@@ -1,8 +1,5 @@
 __pycache__
-DefaultMaterial.dat
-filehash.txt
-friendlynames.txt
-HDTool_Helper.dll
-NormalPalette.dat
-texconv.exe
-typehash.txt
+*.dat
+*.txt
+*.dll
+*.exe

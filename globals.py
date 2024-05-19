@@ -4,13 +4,17 @@ from .classes_and_defs.stingray.toc import TocManager
 
 DEVBUILD = False
 
-DefaultMaterialPath = f"{os.path.dirname(__file__)}\\DefaultMaterial.dat"
-FileHashPath        = f"{os.path.dirname(__file__)}\\filehash.txt"
-FriendlyNamesPath   = f"{os.path.dirname(__file__)}\\friendlynames.txt"
-DLLPath             = f"{os.path.dirname(__file__)}\\HDTool_Helper.dll"
-PalettePath         = f"{os.path.dirname(__file__)}\\NormalPalette.dat"
-TexconvPath         = f"{os.path.dirname(__file__)}\\texconv.exe"
-TypeHashPath        = f"{os.path.dirname(__file__)}\\typehash.txt"
+AddonPath = os.path.dirname(__file__)
+
+DLLPath     = f"{AddonPath}\\HDTool_Helper.dll"
+TexconvPath = f"{AddonPath}\\texconv.exe"
+
+TypeHashPath      = f"{AddonPath}\\hashes\\typeHashes.txt"
+FileHashPath      = f"{AddonPath}\\hashes\\fileHashes.txt"
+FriendlyNamesPath = f"{AddonPath}\\hashes\\friendlyNames.txt"
+
+PalettePath         = f"{AddonPath}\\dats\\normalPalette.dat"
+DefaultMaterialPath = f"{AddonPath}\\dats\\basic.dat"
 
 CPPHelper  = ctypes.cdll.LoadLibrary(DLLPath) if os.path.isfile(DLLPath) else None
 TocManager = TocManager()

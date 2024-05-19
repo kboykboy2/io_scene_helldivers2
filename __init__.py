@@ -57,10 +57,10 @@ def register():
     bpy.utils.register_class(HD2_Interface_ContextMenu.WM_MT_button_context)
 
 def unregister():
+    bpy.utils.unregister_class(HD2_Interface_ContextMenu.WM_MT_button_context)
     del bpy.types.Scene.Hd2ToolPanelSettings
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
-    bpy.utils.unregister_class(HD2_Interface_ContextMenu.WM_MT_button_context)
 
 if __name__ == "__main__":
     register()
