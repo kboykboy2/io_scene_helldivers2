@@ -227,7 +227,7 @@ class StreamToc:
             f.write(bytes(self.TocFile.Data))
         with open(f"{path}.gpu_resources", "w+b") as f:
             f.write(bytes(self.GpuFile.Data))
-        with open(f"{path.stream}", "w+b") as f:
+        with open(f"{path}.stream", "w+b") as f:
             f.write(bytes(self.StreamFile.Data))
 
     def GetFileData(self, FileID, TypeID):
