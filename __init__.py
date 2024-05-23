@@ -1289,10 +1289,9 @@ class PatchArchiveOperator(Operator):
         return{'FINISHED'}
 
 # dump archive entry button
-class DumpArchiveObjectOperator(Operator, ExportHelper):
+class DumpArchiveObjectOperator(Operator):
     bl_label = "Dump Archive Object"
     bl_idname = "helldiver2.archive_object_dump"
-    filename_ext = ".dump"
 
     directory: StringProperty(name="Outdir Path",description="dump output dir")
     filter_folder: BoolProperty(default=True,options={"HIDDEN"})
