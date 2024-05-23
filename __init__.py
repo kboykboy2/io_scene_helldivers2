@@ -22,15 +22,15 @@ import random as r
 DEVBUILD = False
 AddonPath                   = os.path.dirname(__file__)
 
-Global_dllpath              = f"{AddonPath}\\HDTool_Helper.dll"
-Global_texconvpath          = f"{AddonPath}\\texconv.exe"
+Global_dllpath              = f"{AddonPath}\\deps\\HDTool_Helper.dll"
+Global_texconvpath          = f"{AddonPath}\\deps\\texconv.exe"
+Global_palettepath          = f"{AddonPath}\\deps\\NormalPalette.dat"
 
-Global_palettepath          = f"{AddonPath}\\NormalPalette.dat"
-Global_defaultmaterialpath  = f"{AddonPath}\\DefaultMaterial.dat"
+Global_defaultmaterialpath  = f"{AddonPath}\\materials\\basic.dat"
 
-Global_typehashpath         = f"{AddonPath}\\typehash.txt"
-Global_filehashpath         = f"{AddonPath}\\filehash.txt"
-Global_friendlynamespath    = f"{AddonPath}\\friendlynames.txt"
+Global_typehashpath         = f"{AddonPath}\\hashlists\\typehash.txt"
+Global_filehashpath         = f"{AddonPath}\\hashlists\\filehash.txt"
+Global_friendlynamespath    = f"{AddonPath}\\hashlists\\friendlynames.txt"
 
 Global_CPPHelper = None
 
