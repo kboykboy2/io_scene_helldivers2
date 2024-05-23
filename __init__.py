@@ -20,17 +20,17 @@ import random as r
 ###########################
 
 DEVBUILD = False
-AddonPath                   = os.path.dirname(__file__)
+AddonPath = os.path.dirname(__file__)
 
-Global_dllpath              = f"{AddonPath}\\deps\\HDTool_Helper.dll"
-Global_texconvpath          = f"{AddonPath}\\deps\\texconv.exe"
-Global_palettepath          = f"{AddonPath}\\deps\\NormalPalette.dat"
+Global_dllpath     = f"{AddonPath}\\deps\\HDTool_Helper.dll"
+Global_texconvpath = f"{AddonPath}\\deps\\texconv.exe"
+Global_palettepath = f"{AddonPath}\\deps\\NormalPalette.dat"
 
-Global_defaultmaterialpath  = f"{AddonPath}\\materials\\basic.dat"
+Global_materialpath = f"{AddonPath}\\materials"
 
-Global_typehashpath         = f"{AddonPath}\\hashlists\\typehash.txt"
-Global_filehashpath         = f"{AddonPath}\\hashlists\\filehash.txt"
-Global_friendlynamespath    = f"{AddonPath}\\hashlists\\friendlynames.txt"
+Global_typehashpath      = f"{AddonPath}\\hashlists\\typehash.txt"
+Global_filehashpath      = f"{AddonPath}\\hashlists\\filehash.txt"
+Global_friendlynamespath = f"{AddonPath}\\hashlists\\friendlynames.txt"
 
 Global_CPPHelper = None
 
@@ -1615,18 +1615,28 @@ class AddMaterialOperator(Operator):
     bl_label = "Add Material"
     bl_idname = "helldiver2.material_add"
 
+    materials = (
+        ("basic.dat", "Basic", "The default template derived from the material used for bugs. Viable for use on pretty much anything if you aren't seeking the highest fidelity."),
+        ("test.dat", "Test", "TEST"),
+    )
+
+    selected_material: EnumProperty(items=materials, name="Template")
+
     def execute(self, context):
         Entry = TocEntry()
         Entry.FileID = r.randint(1, 0xffffffffffffffff)
         Entry.TypeID = MaterialID
         Entry.IsCreated = True
-        with open(Global_defaultmaterialpath, 'r+b') as f:
+        with open(f"{Global_materialpath}\\{self.selected_material}", 'r+b') as f:
             data = f.read()
         Entry.TocData_OLD   = data
         Entry.TocData       = data
 
         Global_TocManager.AddNewEntryToPatch(Entry)
         return{'FINISHED'}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
 
 class SaveMaterialOperator(Operator):
     bl_label = "Save Material"
