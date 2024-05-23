@@ -9,7 +9,7 @@ bl_info = {
 from bpy_extras.io_utils import ImportHelper
 from bpy_extras.io_utils import ExportHelper
 from bpy.props import StringProperty, BoolProperty, IntProperty, FloatProperty, FloatVectorProperty, EnumProperty, PointerProperty
-from bpy.types import Panel, Operator, AddonPreferences, PropertyGroup, Scene, Image
+from bpy.types import Panel, Operator, AddonPreferences, PropertyGroup, Scene, Image, Menu
 import bpy, bmesh, mathutils
 from pathlib import Path
 import math, struct, ctypes, os, tempfile, subprocess, time, copy, zlib, webbrowser, threading
@@ -1349,8 +1349,6 @@ class PasteArchiveEntryOperator(Operator):
     bl_label = "Paste Entry"
     bl_idname = "helldiver2.archive_paste"
 
-    object_id: StringProperty()
-    object_typeid: StringProperty()
     def execute(self, context):
         Global_TocManager.Paste()
         return{'FINISHED'}
@@ -3112,7 +3110,7 @@ class BatchSaveStingrayMeshOperator(Operator):
 #### ---- Archive Search GUI ---- ####
 ######################################
 
-class SearchArchivesOperator(bpy.types.Operator):
+class SearchArchivesOperator(Operator):
     bl_label = "Search All Archives"
     bl_idname = "helldiver2.search_archives"
 
@@ -3267,7 +3265,7 @@ class ArchiveEntryOperator(Operator):
         Global_TocManager.SelectEntries([Entry])
         return {'FINISHED'}
 
-class WM_MT_button_context(bpy.types.Menu):
+class WM_MT_button_context(Menu):
     bl_label = "Entry Context Menu"
 
     def draw(self, context):
@@ -3396,6 +3394,9 @@ def DrawEntryButtons(row, Entry):
     props = row.operator("helldiver2.archive_copy", icon='COPYDOWN', text=CopyName)
     props.object_id     = FileIDStr
     props.object_typeid = TypeIDStr
+    if len(Global_TocManager.CopyBuffer) != 0:
+        row.operator("helldiver2.archive_paste", icon='PASTEDOWN', text="Paste "+str(len(Global_TocManager.CopyBuffer))+" Entries")
+        row.operator("helldiver2.archive_clearclipboard", icon='TRASH', text="Clear Clipboard")
     if SingleEntry:
         props = row.operator("helldiver2.archive_duplicate", icon='DUPLICATE', text="Duplicate Entry")
         props.object_id     = str(Entry.FileID)
@@ -3469,75 +3470,74 @@ def Patches_callback(scene, context):
     return [(Archive.Name, Archive.Name, "") for Archive in Global_TocManager.Patches]
 class Hd2ToolPanelSettings(PropertyGroup):
     # Patches
-    Patches       : EnumProperty(name="Patches", items=Patches_callback)
-    PatchOnly     : BoolProperty(name="PatchOnly", description = "Show only patch entries", default = False)
+    Patches   : EnumProperty(name="Patches", items=Patches_callback)
+    PatchOnly : BoolProperty(name="Show Patch Entries Only", description = "Filter list to entries present in current patch", default = False)
     # Archive
-    LoadedArchives : EnumProperty(name="LoadedArchives", items=LoadedArchives_callback)
-    ShowMeshes     : BoolProperty(name="Mesh", description = "Show Meshes", default = True)
-    ShowTextures   : BoolProperty(name="Tex", description = "Show Textures", default = True)
-    ShowMaterials  : BoolProperty(name="Mat", description = "Show Materials", default = True)
-    ShowAllElse    : BoolProperty(name="Other", description = "Show All Else", default = False)
-    MenuExpanded   : BoolProperty(default = False)
     ContentsExpanded : BoolProperty(default = True)
-    SearchField    : StringProperty(default = "")
-    # Mesh Import
-    MeshImportMenuExpanded : BoolProperty(default = False)
-    ImportMaterials        : BoolProperty(name="ImportMaterials", description = "Import Materials", default = True)
-    ImportLods             : BoolProperty(name="ImportLods", description = "Import Lods", default = False)
-    ImportGroup0           : BoolProperty(name="ImportOnlyGroup0", description = "Only import the first vertex group, ignore others", default = True)
-    ImportPhysics          : BoolProperty(name="ImportPhysics", description = "Import Physics Bodies", default = False)
-    MakeCollections        : BoolProperty(name="MakeCollections", description = "Make New Collection When Importing Meshes", default = True)
-    # Mesh Export
-    MeshExportMenuExpanded : BoolProperty(default = False)
-    Force2UVs              : BoolProperty(name="Force2UVs", description = "Force at least 2 uv sets (some materials require at least 2)", default = True)
-    Force1Group            : BoolProperty(name="Force1Group", description = "Force mesh to only have 1 vertex group", default = True)
-    AutoLods               : BoolProperty(name="AutoLods", description = "Automatically generate lods based on lod0 (duplicates lod0 for now)", default = True)
+    LoadedArchives   : EnumProperty(name="LoadedArchives", items=LoadedArchives_callback)
+    # Settings
+    MenuExpanded     : BoolProperty(default = False)
+    ShowMeshes       : BoolProperty(name="Meshes", description = "Show Meshes", default = True)
+    ShowTextures     : BoolProperty(name="Textures", description = "Show Textures", default = True)
+    ShowMaterials    : BoolProperty(name="Materials", description = "Show Materials", default = True)
+    ShowOthers       : BoolProperty(name="Other", description = "Show All Else", default = False)
+    ImportMaterials  : BoolProperty(name="Import Materials", description = "Fully import materials by appending the textures utilized, otherwise create placeholders", default = True)
+    ImportLods       : BoolProperty(name="Import LODs", description = "Import LODs", default = False)
+    ImportGroup0     : BoolProperty(name="Import Group 0 Only", description = "Only import the first vertex group, ignore others", default = True)
+    ImportPhysics    : BoolProperty(name="Import Physics", description = "Import Physics Bodies", default = False)
+    MakeCollections  : BoolProperty(name="Make Collections", description = "Make new collection when importing meshes", default = True)
+    Force2UVs        : BoolProperty(name="Force 2 UV Sets", description = "Force at least 2 UV sets, some materials require this", default = True)
+    Force1Group      : BoolProperty(name="Force 1 Group", description = "Force mesh to only have 1 vertex group", default = True)
+    AutoLods         : BoolProperty(name="Auto LODs", description = "Automatically generate LOD entries based on LOD0, does not actually reduce the quality of the mesh", default = True)
+    # Search
+    SearchField : StringProperty(default = "")
 
 #UI Panel Class
-class HellDivers2ToolsPanel(bpy.types.Panel):
-    bl_label = "HellDivers2 Mesh Editing"
+class HellDivers2ToolsPanel(Panel):
+    bl_label = "Helldivers 2"
     bl_idname = "SF_PT_Tools"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "HellDivers2 Tools"
+    bl_category = "Modding"
 
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        row = layout.row()
 
-        # Draw Archive Display Settings
+        # Draw Settings, Documentation and Spreadsheet
+        row = layout.row()
         row.prop(scene.Hd2ToolPanelSettings, "MenuExpanded",
             icon="DOWNARROW_HLT" if scene.Hd2ToolPanelSettings.MenuExpanded else "RIGHTARROW",
-            icon_only=True, emboss=False, text="Archive Display Settings")
+            icon_only=True, emboss=False, text="Settings")
+        row.operator("helldiver2.help", icon='HELP', text="")
+        row.operator("helldiver2.archive_spreadsheet", icon='INFO', text="")
         if scene.Hd2ToolPanelSettings.MenuExpanded:
-            row = layout.row(); row.separator(); box = row.box(); row = box.grid_flow(row_major=False, columns=4)
+            row = layout.row(); row.separator(); row.label(text="Display Types"); box = row.box(); row = box.grid_flow(columns=1)
             row.prop(scene.Hd2ToolPanelSettings, "ShowMeshes")
             row.prop(scene.Hd2ToolPanelSettings, "ShowTextures")
             row.prop(scene.Hd2ToolPanelSettings, "ShowMaterials")
-            row.prop(scene.Hd2ToolPanelSettings, "ShowAllElse")
-        # Mesh Import Settings
-        row = layout.row()
-        row.prop(scene.Hd2ToolPanelSettings, "MeshImportMenuExpanded",
-            icon="DOWNARROW_HLT" if scene.Hd2ToolPanelSettings.MeshImportMenuExpanded else "RIGHTARROW",
-            icon_only=True, emboss=False, text="Mesh Import Settings")
-        if scene.Hd2ToolPanelSettings.MeshImportMenuExpanded:
-            row = layout.row(); row.separator(); box = row.box(); row = box.grid_flow(row_major=True, columns=3)
+            row.prop(scene.Hd2ToolPanelSettings, "ShowOthers")
+            row = layout.row(); row.separator(); row.label(text="Import Options"); box = row.box(); row = box.grid_flow(columns=1)
             row.prop(scene.Hd2ToolPanelSettings, "ImportMaterials")
             row.prop(scene.Hd2ToolPanelSettings, "ImportLods")
             row.prop(scene.Hd2ToolPanelSettings, "ImportGroup0")
             row.prop(scene.Hd2ToolPanelSettings, "MakeCollections")
             row.prop(scene.Hd2ToolPanelSettings, "ImportPhysics")
-        # Mesh Export Settings
-        row = layout.row()
-        row.prop(scene.Hd2ToolPanelSettings, "MeshExportMenuExpanded",
-            icon="DOWNARROW_HLT" if scene.Hd2ToolPanelSettings.MeshExportMenuExpanded else "RIGHTARROW",
-            icon_only=True, emboss=False, text="Mesh Export Settings")
-        if scene.Hd2ToolPanelSettings.MeshExportMenuExpanded:
-            row = layout.row(); row.separator(); box = row.box(); row = box.grid_flow(row_major=True, columns=3)
+            row = layout.row(); row.separator(); row.label(text="Export Options"); box = row.box(); row = box.grid_flow(columns=1)
             row.prop(scene.Hd2ToolPanelSettings, "Force2UVs")
             row.prop(scene.Hd2ToolPanelSettings, "Force1Group")
             row.prop(scene.Hd2ToolPanelSettings, "AutoLods")
+
+        # Draw Archive Import/Export Buttons
+        row = layout.row(); row = layout.row(align=True)
+        row.operator("helldiver2.archive_import", icon= 'IMPORT').is_patch = False
+        row.operator("helldiver2.archive_unloadall", icon= 'FILE_REFRESH', text="")
+        row = layout.row()
+        row.prop(scene.Hd2ToolPanelSettings, "LoadedArchives", text="Archives")
+        row.operator("helldiver2.search_archives", icon= 'VIEWZOOM', text="")
+        row = layout.row()
+        if len(Global_TocManager.LoadedArchives) > 0:
+            Global_TocManager.SetActiveByName(scene.Hd2ToolPanelSettings.LoadedArchives)
 
         # Draw Patch Stuff
         row = layout.row(); row = layout.row(align=True)
@@ -3549,33 +3549,12 @@ class HellDivers2ToolsPanel(bpy.types.Panel):
             Global_TocManager.SetActivePatchByName(scene.Hd2ToolPanelSettings.Patches)
         row.operator("helldiver2.archive_import", icon= 'IMPORT', text="").is_patch = True
 
-        # Draw Archive Import/Export Buttons
-        row = layout.row(); row = layout.row(align=True)
-        row.operator("helldiver2.help", icon= 'HELP', text="")
-        row.operator("helldiver2.archive_spreadsheet", icon= 'INFO', text="")
-        row.operator("helldiver2.archive_import", icon= 'IMPORT').is_patch = False
-        row.operator("helldiver2.archive_unloadall", icon= 'FILE_REFRESH', text="")
-        row = layout.row()
-        row.prop(scene.Hd2ToolPanelSettings, "LoadedArchives", text="Archives")
-        row.operator("helldiver2.search_archives", icon= 'VIEWZOOM', text="")
-        row = layout.row()
-        if len(Global_TocManager.LoadedArchives) > 0:
-            Global_TocManager.SetActiveByName(scene.Hd2ToolPanelSettings.LoadedArchives)
-
-        # Draw Search Bar
-        row = layout.row(); row = layout.row()
-        row.prop(scene.Hd2ToolPanelSettings, "SearchField", icon='VIEWZOOM', text="")
-        row.prop(scene.Hd2ToolPanelSettings, "PatchOnly", text="")
-        # Draw Paste Button
-        row = layout.row(align=True)
-        row.operator("helldiver2.archive_paste", icon='PASTEDOWN', text="Paste "+str(len(Global_TocManager.CopyBuffer)))
-        row.operator("helldiver2.archive_clearclipboard", icon='TRASH', text="Clear Clipboard")
-        row = layout.row()
-
         # Draw Archive Contents
+        row = layout.row()
         row.prop(scene.Hd2ToolPanelSettings, "ContentsExpanded",
             icon="DOWNARROW_HLT" if scene.Hd2ToolPanelSettings.ContentsExpanded else "RIGHTARROW",
-            icon_only=True, emboss=True, text="Archive Contents")
+            icon_only=True, emboss=False, text="Archive Contents")
+        row.prop(scene.Hd2ToolPanelSettings, "PatchOnly", text="")
 
         # Get Display Data
         DisplayData = GetDisplayData()
@@ -3587,6 +3566,11 @@ class HellDivers2ToolsPanel(bpy.types.Panel):
         NewFriendlyIDs = []
         if scene.Hd2ToolPanelSettings.ContentsExpanded:
             if len(DisplayTocEntries) == 0: return
+
+            # Draw Search Bar
+            row = layout.row(); row = layout.row()
+            row.prop(scene.Hd2ToolPanelSettings, "SearchField", icon='VIEWZOOM', text="")
+
             DrawChain = []
             for Type in DisplayTocTypes:
                 # check if there is any entry of this type that matches search field
@@ -3610,7 +3594,7 @@ class HellDivers2ToolsPanel(bpy.types.Panel):
                 elif Type.TypeID == MaterialID:
                     type_icon = 'MATERIAL'
                     if not scene.Hd2ToolPanelSettings.ShowMaterials: continue
-                elif not scene.Hd2ToolPanelSettings.ShowAllElse: continue
+                elif not scene.Hd2ToolPanelSettings.ShowOthers: continue
 
                 # Draw Type Header
                 box = layout.box(); row = box.row()
@@ -3733,12 +3717,12 @@ def register():
 
     for cls in classes_to_register:
         bpy.utils.register_class(cls)
-    bpy.types.Scene.Hd2ToolPanelSettings = PointerProperty(type=Hd2ToolPanelSettings)
+    Scene.Hd2ToolPanelSettings = PointerProperty(type=Hd2ToolPanelSettings)
 
     bpy.utils.register_class(WM_MT_button_context)
 
 def unregister():
-    del bpy.types.Scene.Hd2ToolPanelSettings
+    del Scene.Hd2ToolPanelSettings
     for cls in classes_to_register:
         bpy.utils.unregister_class(cls)
 
