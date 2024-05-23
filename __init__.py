@@ -681,6 +681,19 @@ def LoadTypeHashes():
             parts = line.split(" ")
             Global_TypeHashes.append([int(parts[0], 16), parts[1].replace("\n", "")])
 
+def GetTextureTypeFromID(ID):
+    match ID:
+        case 14423187101809176546:
+            return "color: "
+        case 12451968300768537108:
+            return "sss color: "
+        case 16331558339684530227:
+            return "pbr: "
+        case 6363549403025827661:
+            return "normal: "
+        case _:
+            return ""
+
 def GetTypeNameFromID(ID):
     for hash_info in Global_TypeHashes:
         if int(ID) == hash_info[0]:
@@ -1648,12 +1661,17 @@ class SetMaterialTexture(Operator, ImportHelper):
     bl_label = "Set Material Texture"
     bl_idname = "helldiver2.material_settex"
 
+    filename_ext = ".dds"
+
+    filter_glob: StringProperty(
+        default="*.dds",
+        options={'HIDDEN'},
+    )
+
     object_id: StringProperty()
     tex_idx: IntProperty()
-    def execute(self, context):
-        if self.filepath[-3:] != "dds":
-            raise Exception("file must be dds")
 
+    def execute(self, context):
         Entry = Global_TocManager.GetEntry(int(self.object_id), MaterialID)
         if Entry != None:
             if Entry.IsLoaded:
@@ -1668,15 +1686,12 @@ def DrawMaterialEditor(Entry, layout, row):
             for TexIndex in range(len(mat.TexIDs)):
                 row = layout.row()
                 row.separator(); row.separator(); row.separator()
+                textureType = GetTextureTypeFromID(mat.TexIDs[TexIndex])
                 if mat.DEV_DDSPaths[TexIndex] != None:
-                    row.label(text=mat.DEV_DDSPaths[TexIndex], icon='FILE_IMAGE')
+                    filepath = Path(mat.DEV_DDSPaths[TexIndex])
+                    row.label(text=GetTextureTypeFromID(mat.TexIDs[TexIndex])+filepath.name, icon='FILE_IMAGE')
                 else:
-                    textstr = str(mat.TexIDs[TexIndex])
-                    if mat.TexIDs[TexIndex] == 14423187101809176546: textstr += ": color"
-                    if mat.TexIDs[TexIndex] == 12451968300768537108: textstr += ": sss color"
-                    if mat.TexIDs[TexIndex] == 16331558339684530227: textstr += ": pbr"
-                    if mat.TexIDs[TexIndex] == 6363549403025827661: textstr += ": normal"
-                    row.label(text=textstr, icon='FILE_IMAGE')
+                    row.label(text=textureType+str(mat.TexIDs[TexIndex]), icon='FILE_IMAGE')
                 props = row.operator("helldiver2.material_settex", icon='FILEBROWSER', text="")
                 props.object_id = str(Entry.FileID)
                 props.tex_idx   = TexIndex
