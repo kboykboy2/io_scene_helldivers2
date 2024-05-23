@@ -1296,8 +1296,8 @@ class DumpArchiveObjectOperator(Operator):
     directory: StringProperty(name="Outdir Path",description="dump output dir")
     filter_folder: BoolProperty(default=True,options={"HIDDEN"})
 
-    object_id: StringProperty()
-    object_typeid: StringProperty()
+    object_id: StringProperty(options={"HIDDEN"})
+    object_typeid: StringProperty(options={"HIDDEN"})
     def execute(self, context):
         Entries = EntriesFromStrings(self.object_id, self.object_typeid)
         for Entry in Entries:
@@ -1677,8 +1677,8 @@ class SetMaterialTexture(Operator, ImportHelper):
         options={'HIDDEN'},
     )
 
-    object_id: StringProperty()
-    tex_idx: IntProperty()
+    object_id: StringProperty(options={"HIDDEN"})
+    tex_idx: IntProperty(options={"HIDDEN"})
 
     def execute(self, context):
         Entry = Global_TocManager.GetEntry(int(self.object_id), MaterialID)
@@ -1871,7 +1871,7 @@ class BatchExportTextureOperator(Operator):
     directory: StringProperty(name="Outdir Path",description="dds output dir")
     filter_folder: BoolProperty(default=True,options={"HIDDEN"})
 
-    object_id: StringProperty()
+    object_id: StringProperty(options={"HIDDEN"})
     def execute(self, context):
         EntriesIDs = IDsFromString(self.object_id)
         for EntryID in EntriesIDs:
@@ -1892,7 +1892,7 @@ class ExportTextureOperator(Operator, ExportHelper):
     bl_idname = "helldiver2.texture_export"
     filename_ext = ".dds"
 
-    object_id: StringProperty()
+    object_id: StringProperty(options={"HIDDEN"})
     def execute(self, context):
         Entry = Global_TocManager.GetEntry(int(self.object_id), TexID)
         if Entry != None:
@@ -1924,7 +1924,7 @@ class SaveTextureFromDDsOperator(Operator, ImportHelper):
     bl_label = "Save Texture"
     bl_idname = "helldiver2.texture_savefromdds"
 
-    object_id: StringProperty()
+    object_id: StringProperty(options={"HIDDEN"})
     def execute(self, context):
         Entry = Global_TocManager.GetEntry(int(self.object_id), TexID)
         if Entry != None:
