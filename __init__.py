@@ -1291,7 +1291,7 @@ class PatchArchiveOperator(Operator):
 # dump archive entry button
 class DumpArchiveObjectOperator(Operator):
     bl_label = "Dump Archive Object"
-    bl_idname = "helldiver2.archive_object_dump"
+    bl_idname = "helldiver2.archive_object_dump_export"
 
     directory: StringProperty(name="Outdir Path",description="dump output dir")
     filter_folder: BoolProperty(default=True,options={"HIDDEN"})
@@ -1317,6 +1317,39 @@ class DumpArchiveObjectOperator(Operator):
     def invoke(self, context, event):
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
+
+# import dump button
+class ImportDumpOperator(Operator, ImportHelper):
+    bl_label = "Import Dump"
+    bl_idname = "helldiver2.archive_object_dump_import"
+
+    object_id: StringProperty(options={"HIDDEN"})
+    object_typeid: StringProperty(options={"HIDDEN"})
+
+    def execute(self, context):
+        if Global_TocManager.ActivePatch == None:
+            raise Exception("No patch exists, please create one first")
+
+        FileID = int(self.object_id.split(',')[0])
+        Entry = Global_TocManager.GetEntry(FileID, MaterialID)
+        if Entry != None:
+            if not Entry.IsLoaded: Entry.Load(False, False)
+            path = self.filepath
+            with open(path, 'r+b') as f:
+                Entry.TocData = f.read()
+            if os.path.isfile(f"{path}.gpu_resources"):
+                with open(f"{path}.gpu_resources", 'r+b') as f:
+                    Entry.GpuData = f.read()
+            else:
+                Entry.GpuData = b""
+            if os.path.isfile(f"{path}.stream"):
+                with open(f"{path}.stream", 'r+b') as f:
+                    Entry.StreamData = f.read()
+            else:
+                Entry.StreamData = b""
+            Entry.IsModified = True
+            Global_TocManager.AddEntryToPatch(Entry.FileID, Entry.TypeID)
+        return{'FINISHED'}
 
 # undo modified archive entry
 class UndoArchiveEntryModOperator(Operator):
@@ -3413,19 +3446,23 @@ def DrawEntryButtons(row, Entry):
     # Draw import buttons
     # TODO: Add generic import buttons
     row.separator()
-    if   AreAllMeshes   : row.operator("helldiver2.archive_mesh_import", icon='IMPORT', text=ImportMeshName).object_id = FileIDStr
-    elif AreAllTextures : row.operator("helldiver2.texture_import", icon='IMPORT', text=ImportTextureName).object_id = FileIDStr
-    elif AreAllMaterials: row.operator("helldiver2.material_import", icon='IMPORT', text=ImportMaterialName).object_id = FileIDStr
-    # Draw export buttons
-    row.separator()
-    if AreAllTextures:
+    if AreAllMeshes:
+        row.operator("helldiver2.archive_mesh_import", icon='IMPORT', text=ImportMeshName).object_id = FileIDStr
+    elif AreAllTextures:
+        row.operator("helldiver2.texture_import", icon='IMPORT', text=ImportTextureName).object_id = FileIDStr
         if SingleEntry:
             row.operator("helldiver2.texture_export", icon='EXPORT', text="Export Texture").object_id = str(Entry.FileID)
         else:
             row.operator("helldiver2.texture_batchexport", icon='EXPORT', text=f"Export {NumSelected} Textures").object_id = FileIDStr
-    props = row.operator("helldiver2.archive_object_dump", icon='PACKAGE', text=DumpObjectName)
+    elif AreAllMaterials:
+        row.operator("helldiver2.material_import", icon='IMPORT', text=ImportMaterialName).object_id = FileIDStr
+    # Draw export buttons
+    row.separator()
+    props = row.operator("helldiver2.archive_object_dump_export", icon='PACKAGE', text=DumpObjectName)
     props.object_id     = FileIDStr
     props.object_typeid = TypeIDStr
+    # Draw dump import button
+    if AreAllMaterials and SingleEntry: row.operator("helldiver2.archive_object_dump_import", icon="IMPORT", text="Import Raw Dump").object_id = FileIDStr
     # Draw save buttons
     row.separator()
     if AreAllMeshes:
@@ -3651,6 +3688,7 @@ classes_to_register = (
     ImportTextureOperator,
     ExportTextureOperator,
     DumpArchiveObjectOperator,
+    ImportDumpOperator,
     Hd2ToolPanelSettings,
     HellDivers2ToolsPanel,
     UndoArchiveEntryModOperator,
