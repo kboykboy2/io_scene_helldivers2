@@ -1220,70 +1220,58 @@ def LoadStingrayTexture(ID, TocData, GpuData, StreamData, Reload, MakeBlendObjec
     exists = True
     try: bpy.data.images[str(ID)]
     except: exists = False
+
     StingrayTex = StingrayTexture()
     StingrayTex.Serialize(MemoryStream(TocData), MemoryStream(GpuData), MemoryStream(StreamData))
     dds = StingrayTex.ToDDs()
 
     if MakeBlendObject and not (exists and not Reload):
         tempdir = tempfile.gettempdir()
-        path = tempdir + "\\" + str(ID) + ".dds";
-        tga_path = tempdir + "\\" + str(ID) + ".tga";
-        with open(path, 'w+b') as f:
+        dds_path = f"{tempdir}\\{ID}.dds"
+        tga_path = f"{tempdir}\\{ID}.tga"
+
+        with open(dds_path, 'w+b') as f:
             f.write(dds)
+        
+        subprocess.run([Global_texconvpath, "-y", "-o", tempdir, "-ft", "tga", "-f", "R8G8B8A8_UNORM", dds_path], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
-        # convert to dds, as blender does not support these version of dds
-        subprocess.run("\""+Global_texconvpath +"\" " + path + " -ft tga -f R8G8B8A8_UNORM -o \""+tempdir+"\"")
-        #subprocess.run("\""+Global_texconvpath +"\" " + path + " -ft tif -o \""+tempdir+"\"")
-
-        # wait until dds is converted, or 5 seconds have passed
-        max_wait_s = 5
-        start = time.time()
-        while time.time() - start < max_wait_s:
-            if os.path.isfile(tga_path):
-                break
         if os.path.isfile(tga_path):
             image = bpy.data.images.load(tga_path)
             image.name = str(ID)
             image.pack()
-            os.remove(tga_path)
-            os.remove(path)
         else:
-            os.remove(path)
-            raise Exception("Failed to convert tex "+str(ID)+" dds to tga, or dds failed to export")
+            raise Exception(f"Failed to convert texture {ID} to TGA, or DDS failed to export")
+    
     return StingrayTex
 
 def BlendImageToStingrayTexture(image, StingrayTex):
     tempdir  = tempfile.gettempdir()
-    dds_path = tempdir + "\\" + "blender_img" + ".dds";
-    tga_path = tempdir + "\\" + "blender_img" + ".tga";
+    dds_path = f"{tempdir}\\blender_img.dds"
+    tga_path = f"{tempdir}\\blender_img.tga"
+
     image.file_format = 'TARGA_RAW'
     image.filepath_raw = tga_path
     image.save()
-    command = f"\"{Global_texconvpath}\" \"{tga_path}\" -ft dds -dx10 -f {StingrayTex.Format} -o \"{tempdir}\""
-    print(command)
-    subprocess.run(command)
-    max_wait_s = 5
-    start = time.time()
-    while time.time() - start < max_wait_s:
-        if os.path.isfile(dds_path):
-            break
+
+    subprocess.run([Global_texconvpath, "-y", "-o", tempdir, "-ft", "dds", "-f", StingrayTex.Format, dds_path], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    
     if os.path.isfile(dds_path):
         with open(dds_path, 'r+b') as f:
             StingrayTex.FromDDs(f.read())
-        os.remove(tga_path)
-        os.remove(dds_path)
     else:
-        os.remove(tga_path)
-        raise Exception("Failed to convert tga to dds")
+        raise Exception("Failed to convert TGA to DDS")
 
 def SaveStingrayTexture(ID, TocData, GpuData, StreamData, LoadedData):
     exists = True
     try: bpy.data.images[str(ID)]
     except: exists = False
+
     Toc = MemoryStream(IOMode="write")
     Gpu = MemoryStream(IOMode="write")
     Stream = MemoryStream(IOMode="write")
+
     LoadedData.Serialize(Toc, Gpu, Stream)
+    
     return [Toc.Data, Gpu.Data, Stream.Data]
 
 #endregion
