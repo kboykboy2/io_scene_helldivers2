@@ -7,15 +7,17 @@ bl_info = {
 #region Imports
 
 # System
-import math, ctypes, os, tempfile, subprocess, time, copy, zlib, webbrowser, threading
+import ctypes, os, tempfile, subprocess, time, webbrowser
 import random as r
+from copy import deepcopy
+from math import ceil
 from pathlib import Path
 
 # Blender
 import bpy, bmesh, mathutils
 from bpy_extras.io_utils import ImportHelper, ExportHelper
-from bpy.props import StringProperty, BoolProperty, IntProperty, FloatProperty, FloatVectorProperty, EnumProperty, PointerProperty
-from bpy.types import Panel, Operator, AddonPreferences, PropertyGroup, Scene, Image, Menu
+from bpy.props import StringProperty, BoolProperty, IntProperty, EnumProperty, PointerProperty
+from bpy.types import Panel, Operator, PropertyGroup, Scene, Menu
 
 # Local
 # NOTE: Not bothering to do importlib reloading shit because these modules are unlikely to be modified frequently enough to warrant testing without Blender restarts
@@ -599,13 +601,13 @@ class TocEntry:
             self.TocDataOffset = TocFile.tell()
         self.TocData = TocFile.bytes(self.TocData)
 
-        if GpuFile.IsWriting(): self.GpuResourceOffset = math.ceil(float(GpuFile.tell())/64)*64
+        if GpuFile.IsWriting(): self.GpuResourceOffset = ceil(float(GpuFile.tell())/64)*64
         if self.GpuResourceSize > 0:
             GpuFile.seek(self.GpuResourceOffset)
             if GpuFile.IsReading(): self.GpuData = bytearray(self.GpuResourceSize)
             self.GpuData = GpuFile.bytes(self.GpuData)
 
-        if StreamFile.IsWriting(): self.StreamOffset = math.ceil(float(StreamFile.tell())/64)*64
+        if StreamFile.IsWriting(): self.StreamOffset = ceil(float(StreamFile.tell())/64)*64
         if self.StreamSize > 0:
             StreamFile.seek(self.StreamOffset)
             if StreamFile.IsReading(): self.StreamData = bytearray(self.StreamSize)
@@ -919,7 +921,7 @@ class TocManager():
         if self.ActivePatch == None:
             raise Exception("No patch exists, please create one first")
         if self.ActivePatch:
-            dup = copy.deepcopy(Entry)
+            dup = deepcopy(Entry)
             dup.IsCreated = True
             # if self.ActivePatch.GetEntry(dup.FileID, dup.TypeID) != None and NewID == None:
             #     GenID = True
@@ -952,7 +954,7 @@ class TocManager():
         if self.ActiveArchive == None:
             raise Exception("No Archive exists to create patch from, please open one first")
 
-        self.ActivePatch = copy.deepcopy(self.ActiveArchive)
+        self.ActivePatch = deepcopy(self.ActiveArchive)
         self.ActivePatch.TocEntries  = []
         self.ActivePatch.TocTypes    = []
         # TODO: ask for which patch index
@@ -984,7 +986,7 @@ class TocManager():
 
         Entry = self.GetEntry(FileID, TypeID)
         if Entry != None:
-            PatchEntry = copy.deepcopy(Entry)
+            PatchEntry = deepcopy(Entry)
             if PatchEntry.IsSelected:
                 self.SelectEntries([PatchEntry], True)
             self.ActivePatch.AddEntry(PatchEntry)
@@ -1095,7 +1097,7 @@ def SaveStingrayMaterial(ID, TocData, GpuData, StreamData, LoadedData):
             Global_TocManager.Load(int(mat.TexIDs[TexIdx]), TexID, False, True)
             Entry = Global_TocManager.GetEntry(int(mat.TexIDs[TexIdx]), TexID, True)
             if Entry != None:
-                Entry = copy.deepcopy(Entry)
+                Entry = deepcopy(Entry)
                 Entry.FileID = r.randint(1, 0xffffffffffffffff)
                 Entry.IsCreated = True
                 Global_TocManager.AddNewEntryToPatch(Entry)
@@ -1341,7 +1343,7 @@ class StingrayCompositeMesh:
 
         if f.IsReading(): f.seek(self.StreamInfoOffset)
         else:
-            f.seek(math.ceil(float(f.tell())/16)*16); self.StreamInfoOffset = f.tell()
+            f.seek(ceil(float(f.tell())/16)*16); self.StreamInfoOffset = f.tell()
         self.NumStreams = f.uint32(len(self.StreamInfoArray))
         if f.IsWriting():
             if not redo_offsets: self.StreamInfoOffsets = [0 for n in range(self.NumStreams)]
@@ -1638,7 +1640,7 @@ class StreamInfo:
         self.IndexBufferSize    = f.uint32(self.IndexBufferSize)
         # allign to 16
         self.UnkEndingBytes     = f.bytes(self.UnkEndingBytes, 16) # exact length is unknown
-        EndOffset = math.ceil(float(f.tell())/16) * 16
+        EndOffset = ceil(float(f.tell())/16) * 16
         # component info
         f.seek(self.DEV_ComponentInfoOffset)
         if f.IsReading():
@@ -1714,7 +1716,6 @@ class RawMaterialClass:
         else:
             try:
                 self.MatID   = int(name)
-                #self.ShortID = zlib.crc32(name.encode())
                 self.ShortID = r.randint(1, 0xffffffff)
             except:
                 raise Exception("Material name must be a number")
@@ -1933,7 +1934,7 @@ class StingrayMeshFile:
         if self.StreamInfoOffset != 0:
             if f.IsReading(): f.seek(self.StreamInfoOffset)
             else:
-                f.seek(math.ceil(float(f.tell())/16)*16); self.StreamInfoOffset = f.tell()
+                f.seek(ceil(float(f.tell())/16)*16); self.StreamInfoOffset = f.tell()
             self.NumStreams = f.uint32(len(self.StreamInfoArray))
             if f.IsWriting():
                 if not redo_offsets: self.StreamInfoOffsets = [0 for n in range(self.NumStreams)]
@@ -2160,7 +2161,7 @@ class StingrayMeshFile:
             VertexOffset += len(mesh.VertexPositions)
         # update stream info
         if gpu.IsWriting():
-            gpu.seek(math.ceil(float(gpu.tell())/16)*16)
+            gpu.seek(ceil(float(gpu.tell())/16)*16)
             Stream_Info.VertexBufferSize    = gpu.tell() - Stream_Info.VertexBufferOffset
             Stream_Info.NumVertices         = VertexOffset
 
@@ -2316,7 +2317,7 @@ def SaveStingrayMesh(ID, TocData, GpuData, StreamData, StingrayMesh):
         if lod0 != None:
             for n in range(len(FinalMeshes)):
                 if FinalMeshes[n].IsLod():
-                    newmesh = copy.deepcopy(lod0)
+                    newmesh = deepcopy(lod0)
                     newmesh.MeshInfoIndex = FinalMeshes[n].MeshInfoIndex
                     FinalMeshes[n] = newmesh
     StingrayMesh.RawMeshes = FinalMeshes
