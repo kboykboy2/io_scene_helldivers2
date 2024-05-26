@@ -28,17 +28,15 @@ from .memoryStream import MemoryStream
 
 AddonPath = os.path.dirname(__file__)
 
-Global_dllpath     = f"{AddonPath}\\deps\\HDTool_Helper.dll"
-Global_texconvpath = f"{AddonPath}\\deps\\texconv.exe"
-Global_palettepath = f"{AddonPath}\\deps\\NormalPalette.dat"
-
-Global_materialpath = f"{AddonPath}\\materials"
-
+Global_dllpath           = f"{AddonPath}\\deps\\HDTool_Helper.dll"
+Global_texconvpath       = f"{AddonPath}\\deps\\texconv.exe"
+Global_palettepath       = f"{AddonPath}\\deps\\NormalPalette.dat"
+Global_materialpath      = f"{AddonPath}\\materials"
 Global_typehashpath      = f"{AddonPath}\\hashlists\\typehash.txt"
 Global_filehashpath      = f"{AddonPath}\\hashlists\\filehash.txt"
 Global_friendlynamespath = f"{AddonPath}\\hashlists\\friendlynames.txt"
 
-Global_CPPHelper = None
+Global_CPPHelper = ctypes.cdll.LoadLibrary(Global_dllpath) if os.path.isfile(Global_dllpath) else None
 
 #endregion
 
@@ -520,23 +518,17 @@ def Hash64(string):
 #region Functions: Initialization
 
 def LoadNormalPalette(path):
-    global Global_CPPHelper
-    global Global_dllpath
-    if os.path.isfile(Global_dllpath):
-        Global_CPPHelper = ctypes.cdll.LoadLibrary(Global_dllpath)
-        Global_CPPHelper.dll_LoadPalette(path.encode())
+    Global_CPPHelper.dll_LoadPalette(path.encode())
 
 def NormalsFromPalette(normals):
-    global Global_CPPHelper
-    if Global_CPPHelper != None:
-        f = MemoryStream(IOMode = "write")
-        normals = [f.vec3_float(normal) for normal in normals]
-        output    = bytearray(len(normals)*4)
-        c_normals = ctypes.c_char_p(bytes(f.Data))
-        c_output  = (ctypes.c_char * len(output)).from_buffer(output)
-        Global_CPPHelper.dll_NormalsFromPalette(c_output, c_normals, ctypes.c_uint32(len(normals)))
-        F = MemoryStream(output, IOMode = "read")
-        return [F.uint32(0) for normal in normals]
+    f = MemoryStream(IOMode = "write")
+    normals = [f.vec3_float(normal) for normal in normals]
+    output    = bytearray(len(normals)*4)
+    c_normals = ctypes.c_char_p(bytes(f.Data))
+    c_output  = (ctypes.c_char * len(output)).from_buffer(output)
+    Global_CPPHelper.dll_NormalsFromPalette(c_output, c_normals, ctypes.c_uint32(len(normals)))
+    F = MemoryStream(output, IOMode = "read")
+    return [F.uint32(0) for normal in normals]
 
 Global_TypeHashes = []
 def LoadTypeHashes():
@@ -3407,6 +3399,7 @@ classes = (
 )
 
 def register():
+    if Global_CPPHelper == None: raise Exception("HDTool_Helper is required by the addon but failed to load!")
     LoadNormalPalette(Global_palettepath)
     LoadTypeHashes()
     LoadNameHashes()
