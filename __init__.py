@@ -1,25 +1,26 @@
-# Must check all 'TODO IMPORTANT' comments before release
-
 bl_info = {
     "name": "Helldivers 2 Archives",
     "blender": (3, 1, 2), # Significant work carried out on 4.0, should this be increased in case of API incompatibilities?
     "category": "Import-Export",
 }
 
-from bpy_extras.io_utils import ImportHelper
-from bpy_extras.io_utils import ExportHelper
-from bpy.props import StringProperty, BoolProperty, IntProperty, FloatProperty, FloatVectorProperty, EnumProperty, PointerProperty
-from bpy.types import Panel, Operator, AddonPreferences, PropertyGroup, Scene, Image, Menu
-import bpy, bmesh, mathutils
-from pathlib import Path
+#region Imports
+
+# System
 import math, struct, ctypes, os, tempfile, subprocess, time, copy, zlib, webbrowser, threading
 import random as r
+from pathlib import Path
 
-###########################
-#### ---- Globals ---- ####
-###########################
+# Blender
+import bpy, bmesh, mathutils
+from bpy_extras.io_utils import ImportHelper, ExportHelper
+from bpy.props import StringProperty, BoolProperty, IntProperty, FloatProperty, FloatVectorProperty, EnumProperty, PointerProperty
+from bpy.types import Panel, Operator, AddonPreferences, PropertyGroup, Scene, Image, Menu
 
-DEVBUILD = False
+#endregion
+
+#region Global Variables
+
 AddonPath = os.path.dirname(__file__)
 
 Global_dllpath     = f"{AddonPath}\\deps\\HDTool_Helper.dll"
@@ -34,9 +35,160 @@ Global_friendlynamespath = f"{AddonPath}\\hashlists\\friendlynames.txt"
 
 Global_CPPHelper = None
 
-##################################
-#### ---- Math Functions ---- ####
-##################################
+#endregion
+
+#region Common Hashes
+
+CompositeMeshID = 14191111524867688662
+MeshID = 16187218042980615487
+TexID  = 14790446551990181426
+MaterialID  = 16915718763308572383
+
+#endregion
+
+#region Class: MemoryStream
+
+class MemoryStream:
+    def __init__(self, Data=b"", IOMode = "read"):
+        self.Location = 0
+        self.Data = bytearray(Data)
+        self.IOMode = IOMode
+        self.Endian = "<"
+
+    # -- Open Stream --
+    def open(self, Data, IOMode = "read"):
+        self.Data = bytearray(Data)
+        self.IOMode = IOMode
+
+    # -- IO Mode Functions --
+    def SetReadMode(self):
+        self.IOMode = "read"
+    def SetWriteMode(self):
+        self.IOMode = "write"
+    def IsReading(self):
+        return self.IOMode == "read"
+    def IsWriting(self):
+        return self.IOMode == "write"
+
+    # -- Go To Position In Stream --
+    def seek(self, Location):
+        self.Location = Location
+        if self.Location > len(self.Data):
+            missing_bytes = self.Location - len(self.Data)
+            self.Data += bytearray(missing_bytes)
+
+    # -- Get Position In Stream --
+    def tell(self):
+        return self.Location
+
+    # -- Read Bytes From Stream --
+    def read(self, length=-1):
+        if length == -1:
+            length = len(self.Data) - self.Location
+        if self.Location + length > len(self.Data):
+            raise Exception("reading past end of stream")
+
+        newData = self.Data[self.Location:self.Location+length]
+        self.Location += length
+        return bytes(newData)
+
+    # -- Write Bytes To Stream --
+    def write(self, bytes):
+        length = len(bytes)
+        if self.Location + length > len(self.Data):
+            missing_bytes = (self.Location + length) - len(self.Data)
+            self.Data += bytearray(missing_bytes)
+        self.Data[self.Location:self.Location+length] = bytearray(bytes)
+        self.Location += length
+
+    # -- Serialization Functions --
+    def serialize(self, value, format, size):
+        format = self.Endian+format
+        if self.IsReading():
+            return struct.unpack(format, self.read(size))[0]
+        elif self.IsWriting():
+            self.write(struct.pack(format, value))
+            return value
+
+    def int8(self, value):
+        return self.serialize(value, 'b', 1)
+    def uint8(self, value):
+        return self.serialize(value, 'B', 1)
+    def int16(self, value):
+        return self.serialize(value, 'h', 2)
+    def uint16(self, value):
+        return self.serialize(value, 'H', 2)
+    def int32(self, value):
+        return self.serialize(value, 'i', 4)
+    def uint32(self, value):
+        return self.serialize(value, 'I', 4)
+    def int64(self, value):
+        return self.serialize(value, 'q', 8)
+    def uint64(self, value):
+        return self.serialize(value, 'Q', 8)
+    def float16(self, value):
+        return self.serialize(value, 'e', 2)
+    def float32(self, value):
+        return self.serialize(value, 'f', 4)
+    def float64(self, value):
+        return self.serialize(value, 'd', 8)
+    def __resize_vec(self, value, length):
+        value = list(value)
+        if len(value) < length:
+            dif = length - len(value)
+            value.extend([0]*dif)
+        if len(value) > length:
+            value = value[:length]
+        return value
+    def vec2_float(self, value):
+        value = self.__resize_vec(value, 2)
+        return [self.float32(value[0]), self.float32(value[1])]
+    def vec3_float(self, value):
+        value = self.__resize_vec(value, 3)
+        return [self.float32(value[0]), self.float32(value[1]), self.float32(value[2])]
+    def vec2_half(self, value):
+        value = self.__resize_vec(value, 2)
+        return [self.float16(value[0]), self.float16(value[1])]
+    def vec3_half(self, value):
+        value = self.__resize_vec(value, 3)
+        return [self.float16(value[0]), self.float16(value[1]), self.float16(value[2])]
+    def vec4_half(self, value):
+        value = self.__resize_vec(value, 4)
+        return [self.float16(value[0]), self.float16(value[1]), self.float16(value[2]), self.float16(value[3])]
+    def vec4_uint8(self, value):
+        value = self.__resize_vec(value, 4)
+        return [self.uint8(value[0]), self.uint8(value[1]), self.uint8(value[2]), self.uint8(value[3])]
+    def vec4_uint16(self, value):
+        value = self.__resize_vec(value, 4)
+        return [self.uint16(value[0]), self.uint16(value[1]), self.uint16(value[2]), self.uint16(value[3])]
+    def vec4_uint32(self, value):
+        value = self.__resize_vec(value, 4)
+        return [self.uint32(value[0]), self.uint32(value[1]), self.uint32(value[2]), self.uint32(value[3])]
+    def array(self, type, value, size = -1):
+        if size == -1:
+            size = len(value)
+        if len(value) != size:
+            value = range(size)
+
+        for n in range(size):
+            value[n] = type()
+        return value
+    def bytes(self, value, size = -1):
+        if size == -1:
+            size = len(value)
+        if len(value) != size:
+            value = bytearray(size)
+
+        if self.IsReading():
+            return bytearray(self.read(size))
+        elif self.IsWriting():
+            self.write(value)
+            return bytearray(value)
+        return value
+
+#endregion
+
+#region Functions: Math
 
 def InsureBitLength(bits, length):
     # cut off if to big
@@ -95,9 +247,10 @@ def MakeTenBitSigned(vec):
     binary = InsureBitLength(zbin+ybin+xbin, 32)
     return int(binary, 2)
 
-###############################
-#### ---- Extra Utils ---- ####
-###############################
+#endregion
+
+#region Functions: Miscellaneous
+
 def DXGI_FORMAT(format):
     Dict = {0: "UNKNOWN", 1: "R32G32B32A32_TYPELESS", 2: "R32G32B32A32_FLOAT", 3: "R32G32B32A32_UINT", 4: "R32G32B32A32_SINT", 5: "R32G32B32_TYPELESS", 6: "R32G32B32_FLOAT", 7: "R32G32B32_UINT", 8: "R32G32B32_SINT", 9: "R16G16B16A16_TYPELESS", 10: "R16G16B16A16_FLOAT", 11: "R16G16B16A16_UNORM", 12: "R16G16B16A16_UINT", 13: "R16G16B16A16_SNORM", 14: "R16G16B16A16_SINT", 15: "R32G32_TYPELESS", 16: "R32G32_FLOAT", 17: "R32G32_UINT", 18: "R32G32_SINT", 19: "R32G8X24_TYPELESS", 20: "D32_FLOAT_S8X24_UINT", 21: "R32_FLOAT_X8X24_TYPELESS", 22: "X32_TYPELESS_G8X24_UINT", 23: "R10G10B10A2_TYPELESS", 24: "R10G10B10A2_UNORM", 25: "R10G10B10A2_UINT", 26: "R11G11B10_FLOAT", 27: "R8G8B8A8_TYPELESS", 28: "R8G8B8A8_UNORM", 29: "R8G8B8A8_UNORM_SRGB", 30: "R8G8B8A8_UINT", 31: "R8G8B8A8_SNORM", 32: "R8G8B8A8_SINT", 33: "R16G16_TYPELESS", 34: "R16G16_FLOAT", 35: "R16G16_UNORM", 36: "R16G16_UINT", 37: "R16G16_SNORM", 38: "R16G16_SINT", 39: "R32_TYPELESS", 40: "D32_FLOAT", 41: "R32_FLOAT", 42: "R32_UINT", 43: "R32_SINT", 44: "R24G8_TYPELESS", 45: "D24_UNORM_S8_UINT", 46: "R24_UNORM_X8_TYPELESS", 47: "X24_TYPELESS_G8_UINT", 48: "R8G8_TYPELESS", 49: "R8G8_UNORM", 50: "R8G8_UINT", 51: "R8G8_SNORM", 52: "R8G8_SINT", 53: "R16_TYPELESS", 54: "R16_FLOAT", 55: "D16_UNORM", 56: "R16_UNORM", 57: "R16_UINT", 58: "R16_SNORM", 59: "R16_SINT", 60: "R8_TYPELESS", 61: "R8_UNORM", 62: "R8_UINT", 63: "R8_SNORM", 64: "R8_SINT", 65: "A8_UNORM", 66: "R1_UNORM", 67: "R9G9B9E5_SHAREDEXP", 68: "R8G8_B8G8_UNORM", 69: "G8R8_G8B8_UNORM", 70: "BC1_TYPELESS", 71: "BC1_UNORM", 72: "BC1_UNORM_SRGB", 73: "BC2_TYPELESS", 74: "BC2_UNORM", 75: "BC2_UNORM_SRGB", 76: "BC3_TYPELESS", 77: "BC3_UNORM", 78: "BC3_UNORM_SRGB", 79: "BC4_TYPELESS", 80: "BC4_UNORM", 81: "BC4_SNORM", 82: "BC5_TYPELESS", 83: "BC5_UNORM", 84: "BC5_SNORM", 85: "B5G6R5_UNORM", 86: "B5G5R5A1_UNORM", 87: "B8G8R8A8_UNORM", 88: "B8G8R8X8_UNORM", 89: "R10G10B10_XR_BIAS_A2_UNORM", 90: "B8G8R8A8_TYPELESS", 91: "B8G8R8A8_UNORM_SRGB", 92: "B8G8R8X8_TYPELESS", 93: "B8G8R8X8_UNORM_SRGB", 94: "BC6H_TYPELESS", 95: "BC6H_UF16", 96: "BC6H_SF16", 97: "BC7_TYPELESS", 98: "BC7_UNORM", 99: "BC7_UNORM_SRGB", 100: "AYUV", 101: "Y410", 102: "Y416", 103: "NV12", 104: "P010", 105: "P016", 106: "420_OPAQUE", 107: "YUY2", 108: "Y210", 109: "Y216", 110: "NV11", 111: "AI44", 112: "IA44", 113: "P8", 114: "A8P8", 115: "B4G4R4A4_UNORM", 130: "P208", 131: "V208", 132: "V408"}
     return Dict[format]
@@ -108,7 +261,7 @@ def DXGI_FORMAT_SIZE(format):
     elif format.find("BC") != -1:
         return 16
     else:
-        raise Exception("Fuck this shit man")
+        raise Exception("Provided DDS' format is currently unsupported")
 
 def EntriesFromStrings(file_id_string, type_id_string):
     FileIDs = file_id_string.split(',')
@@ -135,9 +288,34 @@ def IDsFromString(file_id_string):
             Entries.append(int(FileIDs[n]))
     return Entries
 
-##################################################
-#### ---- Blender Object/Model Functions ---- ####
-##################################################
+def GetDisplayData():
+    # Set display archive TODO: Global_TocManager.LastSelected Draw Index could be wrong if we switch to patch only mode, that should be fixed
+    DisplayTocEntries = []
+    DisplayTocTypes   = []
+    DisplayArchive = Global_TocManager.ActiveArchive
+    if bpy.context.scene.Hd2ToolPanelSettings.PatchOnly:
+        if Global_TocManager.ActivePatch != None:
+            DisplayTocEntries = [[Entry, True] for Entry in Global_TocManager.ActivePatch.TocEntries]
+            DisplayTocTypes   = Global_TocManager.ActivePatch.TocTypes
+    elif Global_TocManager.ActiveArchive != None:
+        DisplayTocEntries = [[Entry, False] for Entry in Global_TocManager.ActiveArchive.TocEntries]
+        DisplayTocTypes   = [Type for Type in Global_TocManager.ActiveArchive.TocTypes]
+        AddedTypes   = [Type.TypeID for Type in DisplayTocTypes]
+        AddedEntries = [Entry[0].FileID for Entry in DisplayTocEntries]
+        if Global_TocManager.ActivePatch != None:
+            for Type in Global_TocManager.ActivePatch.TocTypes:
+                if Type.TypeID not in AddedTypes:
+                    AddedTypes.append(Type.TypeID)
+                    DisplayTocTypes.append(Type)
+            for Entry in Global_TocManager.ActivePatch.TocEntries:
+                if Entry.FileID not in AddedEntries:
+                    AddedEntries.append(Entry.FileID)
+                    DisplayTocEntries.append([Entry, True])
+    return [DisplayTocEntries, DisplayTocTypes]
+
+#endregion
+
+#region Functions: Blender
 
 def duplicate(obj, data=True, actions=True, collection=None):
     obj_copy = obj.copy()
@@ -457,229 +635,9 @@ def CreateModel(model, id, customization_info, bone_names):
                     current_pos = [Bone.v[12], Bone.v[13], Bone.v[14]]
                     bpy.ops.object.empty_add(type='SPHERE', radius=0.08, align='WORLD', location=(current_pos[0], current_pos[1], current_pos[2]), scale=(1, 1, 1))
 
-#######################################
-#### ---- Memory Stream Class ---- ####
-#######################################
-class MemoryStream:
-    def __init__(self, Data=b"", IOMode = "read"):
-        self.Location = 0
-        self.Data = bytearray(Data)
-        self.IOMode = IOMode
-        self.Endian = "<"
+#endregion
 
-    # -- Open Stream --
-    def open(self, Data, IOMode = "read"):
-        self.Data = bytearray(Data)
-        self.IOMode = IOMode
-
-    # -- IO Mode Functions --
-    def SetReadMode(self):
-        self.IOMode = "read"
-    def SetWriteMode(self):
-        self.IOMode = "write"
-    def IsReading(self):
-        return self.IOMode == "read"
-    def IsWriting(self):
-        return self.IOMode == "write"
-
-    # -- Go To Position In Stream --
-    def seek(self, Location):
-        self.Location = Location
-        if self.Location > len(self.Data):
-            missing_bytes = self.Location - len(self.Data)
-            self.Data += bytearray(missing_bytes)
-
-    # -- Get Position In Stream --
-    def tell(self):
-        return self.Location
-
-    # -- Read Bytes From Stream --
-    def read(self, length=-1):
-        if length == -1:
-            length = len(self.Data) - self.Location
-        if self.Location + length > len(self.Data):
-            raise Exception("reading past end of stream")
-
-        newData = self.Data[self.Location:self.Location+length]
-        self.Location += length
-        return bytes(newData)
-
-    # -- Write Bytes To Stream --
-    def write(self, bytes):
-        length = len(bytes)
-        if self.Location + length > len(self.Data):
-            missing_bytes = (self.Location + length) - len(self.Data)
-            self.Data += bytearray(missing_bytes)
-        self.Data[self.Location:self.Location+length] = bytearray(bytes)
-        self.Location += length
-
-    # -- Serialization Functions --
-    def serialize(self, value, format, size):
-        format = self.Endian+format
-        if self.IsReading():
-            return struct.unpack(format, self.read(size))[0]
-        elif self.IsWriting():
-            self.write(struct.pack(format, value))
-            return value
-
-    def int8(self, value):
-        return self.serialize(value, 'b', 1)
-    def uint8(self, value):
-        return self.serialize(value, 'B', 1)
-    def int16(self, value):
-        return self.serialize(value, 'h', 2)
-    def uint16(self, value):
-        return self.serialize(value, 'H', 2)
-    def int32(self, value):
-        return self.serialize(value, 'i', 4)
-    def uint32(self, value):
-        return self.serialize(value, 'I', 4)
-    def int64(self, value):
-        return self.serialize(value, 'q', 8)
-    def uint64(self, value):
-        return self.serialize(value, 'Q', 8)
-    def float16(self, value):
-        return self.serialize(value, 'e', 2)
-    def float32(self, value):
-        return self.serialize(value, 'f', 4)
-    def float64(self, value):
-        return self.serialize(value, 'd', 8)
-    def __resize_vec(self, value, length):
-        value = list(value)
-        if len(value) < length:
-            dif = length - len(value)
-            value.extend([0]*dif)
-        if len(value) > length:
-            value = value[:length]
-        return value
-    def vec2_float(self, value):
-        value = self.__resize_vec(value, 2)
-        return [self.float32(value[0]), self.float32(value[1])]
-    def vec3_float(self, value):
-        value = self.__resize_vec(value, 3)
-        return [self.float32(value[0]), self.float32(value[1]), self.float32(value[2])]
-    def vec2_half(self, value):
-        value = self.__resize_vec(value, 2)
-        return [self.float16(value[0]), self.float16(value[1])]
-    def vec3_half(self, value):
-        value = self.__resize_vec(value, 3)
-        return [self.float16(value[0]), self.float16(value[1]), self.float16(value[2])]
-    def vec4_half(self, value):
-        value = self.__resize_vec(value, 4)
-        return [self.float16(value[0]), self.float16(value[1]), self.float16(value[2]), self.float16(value[3])]
-    def vec4_uint8(self, value):
-        value = self.__resize_vec(value, 4)
-        return [self.uint8(value[0]), self.uint8(value[1]), self.uint8(value[2]), self.uint8(value[3])]
-    def vec4_uint16(self, value):
-        value = self.__resize_vec(value, 4)
-        return [self.uint16(value[0]), self.uint16(value[1]), self.uint16(value[2]), self.uint16(value[3])]
-    def vec4_uint32(self, value):
-        value = self.__resize_vec(value, 4)
-        return [self.uint32(value[0]), self.uint32(value[1]), self.uint32(value[2]), self.uint32(value[3])]
-    def array(self, type, value, size = -1):
-        if size == -1:
-            size = len(value)
-        if len(value) != size:
-            value = range(size)
-
-        for n in range(size):
-            value[n] = type()
-        return value
-    def bytes(self, value, size = -1):
-        if size == -1:
-            size = len(value)
-        if len(value) != size:
-            value = bytearray(size)
-
-        if self.IsReading():
-            return bytearray(self.read(size))
-        elif self.IsWriting():
-            self.write(value)
-            return bytearray(value)
-        return value
-
-
-#############################################
-#### ---- Load Normals Palette File ---- ####
-#############################################
-
-Global_NormalPalette = []
-def LoadNormalPalette_py(path):
-    global Global_NormalPalette
-    if len(Global_NormalPalette) > 0:
-        return
-    with open(path, 'r+b') as f:
-        data = f.read()
-    f = MemoryStream(data, IOMode="read")
-    num = f.uint32(0)
-    normals = []
-    normal_palettes = []
-    for n in range(num):
-        normals.append(f.vec3_float([]))
-        normal_palettes.append(f.uint32(0))
-    Global_NormalPalette = [normals, normal_palettes]
-
-def NormalFromPalette_py(normal):
-    lowest_dif = 9999999999999999999
-    lowest_dif_idx = 0
-    for n in range(len(Global_NormalPalette[0])):
-        guide_normal = Global_NormalPalette[0][n]
-        distance = math.sqrt(sum((a - b) ** 2 for a, b in zip(normal, guide_normal)))
-        if distance < lowest_dif:
-            lowest_dif = distance
-            lowest_dif_idx = n
-    return [Global_NormalPalette[1][lowest_dif_idx], Global_NormalPalette[0][lowest_dif_idx]]
-
-def NormalsFromPalette_py(normals, return_real_normals = False):
-    new_normals = []
-    new_normals_testing = []
-    for normal in normals:
-        norms = NormalFromPalette_py(normal)
-        new_normals.append(norms[0])
-        new_normals_testing.append(norms[1])
-    if return_real_normals:
-        return new_normals_testing
-    else:
-        return new_normals
-
-def NormalsFromPalette(normals):
-    global Global_CPPHelper
-    if Global_CPPHelper != None:
-        f = MemoryStream(IOMode = "write")
-        normals = [f.vec3_float(normal) for normal in normals]
-        output    = bytearray(len(normals)*4)
-        c_normals = ctypes.c_char_p(bytes(f.Data))
-        c_output  = (ctypes.c_char * len(output)).from_buffer(output)
-        Global_CPPHelper.dll_NormalsFromPalette(c_output, c_normals, ctypes.c_uint32(len(normals)))
-        F = MemoryStream(output, IOMode = "read")
-        return [F.uint32(0) for normal in normals]
-    else:
-        return NormalsFromPalette_py(normals)
-
-def LoadNormalPalette(path):
-    global Global_CPPHelper
-    global Global_dllpath
-    if os.path.isfile(Global_dllpath):
-        Global_CPPHelper = ctypes.cdll.LoadLibrary(Global_dllpath)
-        Global_CPPHelper.dll_LoadPalette(path.encode())
-    else:
-        LoadNormalPalette_py(path)
-
-
-###########################################
-#### ---- Stingray Hash Functions ---- ####
-###########################################
-
-CompositeMeshID = 14191111524867688662
-MeshID = 16187218042980615487
-TexID  = 14790446551990181426
-MaterialID  = 16915718763308572383
-Global_TypeHashes = []
-def LoadTypeHashes():
-    with open(Global_typehashpath, 'r') as f:
-        for line in f.readlines():
-            parts = line.split(" ")
-            Global_TypeHashes.append([int(parts[0], 16), parts[1].replace("\n", "")])
+#region Functions: Stingray Hashing
 
 def GetTextureTypeFromID(ID):
     match ID:
@@ -706,20 +664,6 @@ def GetIDFromTypeName(Name):
             return int(hash_info[0])
     return None
 
-Global_NameHashes = []
-def LoadNameHashes():
-    Loaded = []
-    with open(Global_filehashpath, 'r') as f:
-        for line in f.readlines():
-            parts = line.split(" ")
-            Global_NameHashes.append([int(parts[0]), parts[1].replace("\n", "")])
-            Loaded.append(int(parts[0]))
-    with open(Global_friendlynamespath, 'r') as f:
-        for line in f.readlines():
-            parts = line.split(" ")
-            if int(parts[0]) not in Loaded:
-                Global_NameHashes.append([int(parts[0]), parts[1].replace("\n", "")])
-                Loaded.append(int(parts[0]))
 def GetFriendlyNameFromID(ID):
     for hash_info in Global_NameHashes:
         if int(ID) == hash_info[0]:
@@ -769,12 +713,54 @@ def Hash64(string):
     F = MemoryStream(output, IOMode = "read")
     return F.uint64(0)
 
-#################################################
-#### ---- Archive Classes And Functions ---- ####
-#################################################
+#endregion
 
-# ----------------------- #
-# -- File Entry In Toc -- #
+#region Functions: Initialization
+
+def LoadNormalPalette(path):
+    global Global_CPPHelper
+    global Global_dllpath
+    if os.path.isfile(Global_dllpath):
+        Global_CPPHelper = ctypes.cdll.LoadLibrary(Global_dllpath)
+        Global_CPPHelper.dll_LoadPalette(path.encode())
+
+def NormalsFromPalette(normals):
+    global Global_CPPHelper
+    if Global_CPPHelper != None:
+        f = MemoryStream(IOMode = "write")
+        normals = [f.vec3_float(normal) for normal in normals]
+        output    = bytearray(len(normals)*4)
+        c_normals = ctypes.c_char_p(bytes(f.Data))
+        c_output  = (ctypes.c_char * len(output)).from_buffer(output)
+        Global_CPPHelper.dll_NormalsFromPalette(c_output, c_normals, ctypes.c_uint32(len(normals)))
+        F = MemoryStream(output, IOMode = "read")
+        return [F.uint32(0) for normal in normals]
+
+Global_TypeHashes = []
+def LoadTypeHashes():
+    with open(Global_typehashpath, 'r') as f:
+        for line in f.readlines():
+            parts = line.split(" ")
+            Global_TypeHashes.append([int(parts[0], 16), parts[1].replace("\n", "")])
+
+Global_NameHashes = []
+def LoadNameHashes():
+    Loaded = []
+    with open(Global_filehashpath, 'r') as f:
+        for line in f.readlines():
+            parts = line.split(" ")
+            Global_NameHashes.append([int(parts[0]), parts[1].replace("\n", "")])
+            Loaded.append(int(parts[0]))
+    with open(Global_friendlynamespath, 'r') as f:
+        for line in f.readlines():
+            parts = line.split(" ")
+            if int(parts[0]) not in Loaded:
+                Global_NameHashes.append([int(parts[0]), parts[1].replace("\n", "")])
+                Loaded.append(int(parts[0]))
+
+#endregion
+
+#region Classes and Functions: Stingray Archives
 
 class TocEntry:
     def __init__(self):
@@ -883,9 +869,6 @@ class TocEntry:
             data = callback(self.FileID, self.TocData, self.GpuData, self.StreamData, self.LoadedData)
             self.SetData(data[0], data[1], data[2])
 
-# ------------------------- #
-# -- Toc File Type Entry -- #
-
 class TocFileType:
     def __init__(self, ID=0, NumFiles=0):
         self.unk1     = 0
@@ -900,10 +883,6 @@ class TocFileType:
         self.unk2     = TocFile.uint32(self.unk2)
         self.unk3     = TocFile.uint32(self.unk3)
         return self
-
-
-# --------------------------- #
-# -- Stream Toc File Class -- #
 
 class StreamToc:
     def __init__(self):
@@ -1024,8 +1003,6 @@ class StreamToc:
             self.TocEntries.remove(Entry)
             self.UpdateTypes()
 
-# ------------------------------ #
-# -- Stream Toc Manager Class -- #
 class TocManager():
     def __init__(self):
         self.SearchArchives  = []
@@ -1150,8 +1127,8 @@ class TocManager():
         if self.ActivePatch:
             dup = copy.deepcopy(Entry)
             dup.IsCreated = True
-            if self.ActivePatch.GetEntry(dup.FileID, dup.TypeID) != None and DEVBUILD and NewID == None:
-                GenID = True
+            # if self.ActivePatch.GetEntry(dup.FileID, dup.TypeID) != None and NewID == None:
+            #     GenID = True
             if GenID and NewID == None: dup.FileID = r.randint(1, 0xffffffffffffffff)
             if NewID != None:
                 dup.FileID = NewID
@@ -1246,275 +1223,12 @@ class TocManager():
         if Entry != None:
             self.CopyPaste(Entry, False, NewID)
 
+#endregion
 
 Global_TocManager = TocManager()
 
-# load archive button
-class LoadArchiveOperator(Operator, ImportHelper):
-    bl_label = "Load Archive"
-    bl_idname = "helldiver2.archive_import"
-    filter_glob: StringProperty(
-    default='*',
-    options={'HIDDEN'}
-    )
-    is_patch: BoolProperty(name="is_patch", default=False)
-    def execute(self, context):
-        global Global_TocManager
-        Global_TocManager.LoadArchive(self.filepath, True, self.is_patch)
-        return{'FINISHED'}
+#region Classes and Functions: Stingray Materials
 
-# load archive button
-class LoadArchivesOperator(Operator):
-    bl_label = "Load Archives"
-    bl_idname = "helldiver2.archives_import"
-
-    paths_str: StringProperty(name="paths_str")
-    def execute(self, context):
-        global Global_TocManager
-        paths = self.paths_str.split(',')
-        for path in paths:
-            if path != "" and os.path.exists(path):
-                Global_TocManager.LoadArchive(path)
-        self.paths = []
-        return{'FINISHED'}
-
-# patch archive button
-class PatchArchiveOperator(Operator):
-    bl_label = "Patch Archive"
-    bl_idname = "helldiver2.archive_export"
-
-    def execute(self, context):
-        global Global_TocManager
-        Global_TocManager.PatchActiveArchive()
-        return{'FINISHED'}
-
-# dump archive entry button
-class DumpArchiveObjectOperator(Operator):
-    bl_label = "Dump Archive Object"
-    bl_idname = "helldiver2.archive_object_dump_export"
-
-    directory: StringProperty(name="Outdir Path",description="dump output dir")
-    filter_folder: BoolProperty(default=True,options={"HIDDEN"})
-
-    object_id: StringProperty(options={"HIDDEN"})
-    object_typeid: StringProperty(options={"HIDDEN"})
-    def execute(self, context):
-        Entries = EntriesFromStrings(self.object_id, self.object_typeid)
-        for Entry in Entries:
-            if Entry != None:
-                data = Entry.GetData()
-                FileName = str(Entry.FileID)+"."+GetTypeNameFromID(Entry.TypeID)
-                with open(self.directory + FileName, 'w+b') as f:
-                    f.write(data[0])
-                if data[1] != b"":
-                    with open(self.directory + FileName+".gpu", 'w+b') as f:
-                        f.write(data[1])
-                if data[2] != b"":
-                    with open(self.directory + FileName+".stream", 'w+b') as f:
-                        f.write(data[2])
-        return{'FINISHED'}
-
-    def invoke(self, context, event):
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
-
-# import dump button
-class ImportDumpOperator(Operator, ImportHelper):
-    bl_label = "Import Dump"
-    bl_idname = "helldiver2.archive_object_dump_import"
-
-    object_id: StringProperty(options={"HIDDEN"})
-    object_typeid: StringProperty(options={"HIDDEN"})
-
-    def execute(self, context):
-        if Global_TocManager.ActivePatch == None:
-            raise Exception("No patch exists, please create one first")
-
-        FileID = int(self.object_id.split(',')[0])
-        Entry = Global_TocManager.GetEntry(FileID, MaterialID)
-        if Entry != None:
-            if not Entry.IsLoaded: Entry.Load(False, False)
-            path = self.filepath
-            with open(path, 'r+b') as f:
-                Entry.TocData = f.read()
-            if os.path.isfile(f"{path}.gpu_resources"):
-                with open(f"{path}.gpu_resources", 'r+b') as f:
-                    Entry.GpuData = f.read()
-            else:
-                Entry.GpuData = b""
-            if os.path.isfile(f"{path}.stream"):
-                with open(f"{path}.stream", 'r+b') as f:
-                    Entry.StreamData = f.read()
-            else:
-                Entry.StreamData = b""
-            Entry.IsModified = True
-            Global_TocManager.AddEntryToPatch(Entry.FileID, Entry.TypeID)
-        return{'FINISHED'}
-
-# undo modified archive entry
-class UndoArchiveEntryModOperator(Operator):
-    bl_label = "Remove Modifications"
-    bl_idname = "helldiver2.archive_undo_mod"
-
-    object_id: StringProperty()
-    object_typeid: StringProperty()
-    def execute(self, context):
-        Entries = EntriesFromStrings(self.object_id, self.object_typeid)
-        for Entry in Entries:
-            if Entry != None:
-                Entry.UndoModifiedData()
-        return{'FINISHED'}
-
-# copy entry
-class CopyArchiveEntryOperator(Operator):
-    bl_label = "Copy Entry"
-    bl_idname = "helldiver2.archive_copy"
-
-    object_id: StringProperty()
-    object_typeid: StringProperty()
-    def execute(self, context):
-        Entries = EntriesFromStrings(self.object_id, self.object_typeid)
-        Global_TocManager.Copy(Entries)
-        return{'FINISHED'}
-
-# paste entry
-class PasteArchiveEntryOperator(Operator):
-    bl_label = "Paste Entry"
-    bl_idname = "helldiver2.archive_paste"
-
-    def execute(self, context):
-        Global_TocManager.Paste()
-        return{'FINISHED'}
-
-# clear clipboard
-class ClearClipboardOperator(Operator):
-    bl_label = "Clear Clipboard"
-    bl_idname = "helldiver2.archive_clearclipboard"
-
-    def execute(self, context):
-        Global_TocManager.ClearClipboard()
-        return{'FINISHED'}
-
-# unload all archives
-class UnloadArchivesOperator(Operator):
-    bl_label = "Unload Archives"
-    bl_idname = "helldiver2.archive_unloadall"
-
-    def execute(self, context):
-        Global_TocManager.UnloadArchives()
-        return{'FINISHED'}
-
-# create patch
-class CreatePatchFromActiveOperator(Operator):
-    bl_label = "Create Patch"
-    bl_idname = "helldiver2.archive_createpatch"
-
-    def execute(self, context):
-        Global_TocManager.CreatePatchFromActive()
-        return{'FINISHED'}
-
-# add entry to patch
-class AddEntryToPatchOperator(Operator):
-    bl_label = "Add Entry To Patch"
-    bl_idname = "helldiver2.archive_addtopatch"
-
-    object_id: StringProperty()
-    object_typeid: StringProperty()
-    def execute(self, context):
-        Entries = EntriesFromStrings(self.object_id, self.object_typeid)
-        for Entry in Entries:
-            Global_TocManager.AddEntryToPatch(Entry.FileID, Entry.TypeID)
-        return{'FINISHED'}
-
-# remove entry from patch
-class RemoveEntryFromPatchOperator(Operator):
-    bl_label = "Remove Entry From Patch"
-    bl_idname = "helldiver2.archive_removefrompatch"
-
-    object_id: StringProperty()
-    object_typeid: StringProperty()
-    def execute(self, context):
-        Entries = EntriesFromStrings(self.object_id, self.object_typeid)
-        for Entry in Entries:
-            Global_TocManager.RemoveEntryFromPatch(Entry.FileID, Entry.TypeID)
-        return{'FINISHED'}
-
-# rename entry in patch
-class RenamePatchEntryOperator(Operator):
-    bl_label = "Rename Entry"
-    bl_idname = "helldiver2.archive_entryrename"
-
-    NewFileID : StringProperty(name="NewFileID", default="")
-    def draw(self, context):
-        layout = self.layout; row = layout.row()
-        row.prop(self, "NewFileID", icon='COPY_ID')
-
-    object_id: StringProperty()
-    object_typeid: StringProperty()
-    def execute(self, context):
-        Entry = Global_TocManager.GetPatchEntry_B(int(self.object_id), int(self.object_typeid))
-        if Entry == None:
-            raise Exception("Entry does not exist in patch (cannot rename non patch entries)")
-        if Entry != None and self.NewFileID != "":
-            Entry.FileID = int(self.NewFileID)
-        return{'FINISHED'}
-
-    def invoke(self, context, event):
-        wm = context.window_manager
-        return wm.invoke_props_dialog(self)
-
-# duplicate entry in patch
-class DuplicateEntryOperator(Operator):
-    bl_label = "Duplicate Entry"
-    bl_idname = "helldiver2.archive_duplicate"
-
-    NewFileID : StringProperty(name="NewFileID", default="")
-    def draw(self, context):
-        layout = self.layout; row = layout.row()
-        row.prop(self, "NewFileID", icon='COPY_ID')
-
-    object_id: StringProperty()
-    object_typeid: StringProperty()
-    def execute(self, context):
-        Global_TocManager.DuplicateEntry(int(self.object_id), int(self.object_typeid), int(self.NewFileID))
-        return{'FINISHED'}
-
-    def invoke(self, context, event):
-        wm = context.window_manager
-        return wm.invoke_props_dialog(self)
-
-
-# rename entry in patch
-class SetEntryFriendlyNameOperator(Operator):
-    bl_label = "Set Friendly Name"
-    bl_idname = "helldiver2.archive_setfriendlyname"
-
-    NewFriendlyName : StringProperty(name="NewFriendlyName", default="")
-    def draw(self, context):
-        layout = self.layout; row = layout.row()
-        row.prop(self, "NewFriendlyName", icon='COPY_ID')
-        row = layout.row()
-        if Hash64(str(self.NewFriendlyName)) == int(self.object_id):
-            row.label(text="Hash is correct")
-        else:
-            row.label(text="Hash is incorrect")
-        row.label(text=str(Hash64(str(self.NewFriendlyName))))
-
-    object_id: StringProperty()
-    def execute(self, context):
-        AddFriendlyName(int(self.object_id), str(self.NewFriendlyName))
-        return{'FINISHED'}
-
-    def invoke(self, context, event):
-        wm = context.window_manager
-        return wm.invoke_props_dialog(self)
-
-#######################################################
-#### ---- Stingray Material Classes/Functions ---- ####
-#######################################################
-
-# -------------------- #
-# -- Material Class -- #
 class StingrayMaterial:
     def __init__(self):
         self.undat1 = self.undat3 = self.undat4 = self.undat5 = self.RemainingData = bytearray()
@@ -1547,8 +1261,6 @@ class StingrayMaterial:
     def EditorUpdate(self):
         self.DEV_DDSPaths = [None for n in range(len(self.TexIDs))]
 
-# ------------------------ #
-# -- Material Functions -- #
 def LoadStingrayMaterial(ID, TocData, GpuData, StreamData, Reload, MakeBlendObject):
     exists = True
     force_reload = False
@@ -1630,115 +1342,10 @@ def AddMaterialToBlend_EMPTY(ID):
         mat = bpy.data.materials.new(str(ID)); mat.name = str(ID)
         mat.diffuse_color = (r.random(), r.random(), r.random(), 1)
 
-class ImportMaterialOperator(Operator):
-    bl_label = "Import Material"
-    bl_idname = "helldiver2.material_import"
+#endregion
 
-    object_id: StringProperty()
-    def execute(self, context):
-        EntriesIDs = IDsFromString(self.object_id)
-        for EntryID in EntriesIDs:
-            Global_TocManager.Load(int(EntryID), MaterialID)
-        return{'FINISHED'}
+#region Classes and Functions: Stingray Textures
 
-class AddMaterialOperator(Operator):
-    bl_label = "Add Material"
-    bl_idname = "helldiver2.material_add"
-
-    materials = (
-        ("basic.dat", "Basic", "The default template derived from the material used for bugs. Viable for use on pretty much anything if you aren't seeking the highest fidelity."),
-        ("test.dat", "Test", "TEST"),
-    )
-
-    selected_material: EnumProperty(items=materials, name="Template")
-
-    def execute(self, context):
-        Entry = TocEntry()
-        Entry.FileID = r.randint(1, 0xffffffffffffffff)
-        Entry.TypeID = MaterialID
-        Entry.IsCreated = True
-        with open(f"{Global_materialpath}\\{self.selected_material}", 'r+b') as f:
-            data = f.read()
-        Entry.TocData_OLD   = data
-        Entry.TocData       = data
-
-        Global_TocManager.AddNewEntryToPatch(Entry)
-        return{'FINISHED'}
-
-    def invoke(self, context, event):
-        return context.window_manager.invoke_props_dialog(self)
-
-class SaveMaterialOperator(Operator):
-    bl_label = "Save Material"
-    bl_idname = "helldiver2.material_save"
-
-    object_id: StringProperty()
-    def execute(self, context):
-        EntriesIDs = IDsFromString(self.object_id)
-        for EntryID in EntriesIDs:
-            Global_TocManager.Save(int(EntryID), MaterialID)
-        return{'FINISHED'}
-
-class ShowMaterialEditorOperator(Operator):
-    bl_label = "Show Material Editor"
-    bl_idname = "helldiver2.material_showeditor"
-
-    object_id: StringProperty()
-    def execute(self, context):
-        Entry = Global_TocManager.GetEntry(int(self.object_id), MaterialID)
-        if Entry != None:
-            if not Entry.IsLoaded: Entry.Load(False, False)
-            mat = Entry.LoadedData
-            if mat.DEV_ShowEditor:
-                print("MakeFalse")
-                mat.DEV_ShowEditor = False
-            else:
-                print("MakeTrue")
-                mat.DEV_ShowEditor = True
-        return{'FINISHED'}
-
-class SetMaterialTexture(Operator, ImportHelper):
-    bl_label = "Set Material Texture"
-    bl_idname = "helldiver2.material_settex"
-
-    filename_ext = ".dds"
-
-    filter_glob: StringProperty(
-        default="*.dds",
-        options={'HIDDEN'},
-    )
-
-    object_id: StringProperty(options={"HIDDEN"})
-    tex_idx: IntProperty(options={"HIDDEN"})
-
-    def execute(self, context):
-        Entry = Global_TocManager.GetEntry(int(self.object_id), MaterialID)
-        if Entry != None:
-            if Entry.IsLoaded:
-                Entry.LoadedData.DEV_DDSPaths[self.tex_idx] = self.filepath
-        return{'FINISHED'}
-
-def DrawMaterialEditor(Entry, layout, row):
-    row.operator("helldiver2.material_showeditor", icon='MOD_LINEART', text="").object_id = str(Entry.FileID)
-    if Entry.IsLoaded:
-        mat = Entry.LoadedData
-        if mat.DEV_ShowEditor:
-            for TexIndex in range(len(mat.TexIDs)):
-                row = layout.row()
-                row.separator(); row.separator(); row.separator()
-                textureType = GetTextureTypeFromID(mat.TexIDs[TexIndex])
-                if mat.DEV_DDSPaths[TexIndex] != None:
-                    filepath = Path(mat.DEV_DDSPaths[TexIndex])
-                    row.label(text=GetTextureTypeFromID(mat.TexIDs[TexIndex])+filepath.name, icon='FILE_IMAGE')
-                else:
-                    row.label(text=textureType+str(mat.TexIDs[TexIndex]), icon='FILE_IMAGE')
-                props = row.operator("helldiver2.material_settex", icon='FILEBROWSER', text="")
-                props.object_id = str(Entry.FileID)
-                props.tex_idx   = TexIndex
-
-######################################################
-#### ---- Stingray Texture Classes/Functions ---- ####
-######################################################
 class StingrayMipmapInfo:
     def __init__(self):
         self.Start     = self.BytesLeft = self.Height = self.Width  = 0
@@ -1748,6 +1355,7 @@ class StingrayMipmapInfo:
         self.Height     = Toc.uint16(self.Height)
         self.Width      = Toc.uint16(self.Width)
         return self
+
 class StingrayTexture:
     def __init__(self):
         self.UnkID = self.Unk1  = self.Unk2  = 0
@@ -1782,12 +1390,13 @@ class StingrayTexture:
             else:
                 self.rawTex = Gpu.Data
 
-
     def ToDDs(self):
         return self.ddsHeader + self.rawTex
+    
     def FromDDs(self, dds):
         self.ddsHeader = dds[:148]
         self.rawTex    = dds[148::]
+    
     def ParseDDsHeader(self):
         dds = MemoryStream(self.ddsHeader, IOMode="read")
         dds.seek(12)
@@ -1797,6 +1406,7 @@ class StingrayTexture:
         self.NumMipMaps = dds.uint32(0)
         dds.seek(128)
         self.Format = DXGI_FORMAT(dds.uint32(0))
+    
     def CalculateGpuMipmaps(self):
         Stride = DXGI_FORMAT_SIZE(self.Format) / 16
         start_mip = max(1, self.NumMipMaps-6)
@@ -1809,7 +1419,6 @@ class StingrayTexture:
 
             if CurrentWidth > 4: CurrentWidth /= 2
             CurrentSize += int((CurrentWidth*CurrentWidth)*Stride)
-
 
 def LoadStingrayTexture(ID, TocData, GpuData, StreamData, Reload, MakeBlendObject):
     exists = True
@@ -1881,103 +1490,10 @@ def SaveStingrayTexture(ID, TocData, GpuData, StreamData, LoadedData):
     LoadedData.Serialize(Toc, Gpu, Stream)
     return [Toc.Data, Gpu.Data, Stream.Data]
 
-# import texture from archive button
-class ImportTextureOperator(Operator):
-    bl_label = "Import Texture"
-    bl_idname = "helldiver2.texture_import"
+#endregion
 
-    object_id: StringProperty()
-    def execute(self, context):
-        EntriesIDs = IDsFromString(self.object_id)
-        for EntryID in EntriesIDs:
-            Global_TocManager.Load(int(EntryID), TexID)
-        return{'FINISHED'}
+#region Classes and Functions: Stingray Bones
 
-# batch export texture to file
-class BatchExportTextureOperator(Operator):
-    bl_label = "Export Textures"
-    bl_idname = "helldiver2.texture_batchexport"
-    filename_ext = ".dds"
-
-    directory: StringProperty(name="Outdir Path",description="dds output dir")
-    filter_folder: BoolProperty(default=True,options={"HIDDEN"})
-
-    object_id: StringProperty(options={"HIDDEN"})
-    def execute(self, context):
-        EntriesIDs = IDsFromString(self.object_id)
-        for EntryID in EntriesIDs:
-            Entry = Global_TocManager.GetEntry(EntryID, TexID)
-            if Entry != None:
-                data = Entry.Load(False, False)
-                with open(self.directory + str(Entry.FileID)+".dds", 'w+b') as f:
-                    f.write(Entry.LoadedData.ToDDs())
-        return{'FINISHED'}
-
-    def invoke(self, context, event):
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
-
-# export texture to file
-class ExportTextureOperator(Operator, ExportHelper):
-    bl_label = "Export Texture"
-    bl_idname = "helldiver2.texture_export"
-    filename_ext = ".dds"
-
-    object_id: StringProperty(options={"HIDDEN"})
-    def execute(self, context):
-        Entry = Global_TocManager.GetEntry(int(self.object_id), TexID)
-        if Entry != None:
-            data = Entry.Load(False, False)
-            with open(self.filepath, 'w+b') as f:
-                f.write(Entry.LoadedData.ToDDs())
-        return{'FINISHED'}
-
-# save texture from blender to archive button
-class SaveTextureFromBlendImageOperator(Operator):
-    bl_label = "Save Texture"
-    bl_idname = "helldiver2.texture_saveblendimage"
-
-    object_id: StringProperty()
-    def execute(self, context):
-        Entries = EntriesFromString(self.object_id, TexID)
-        for Entry in Entries:
-            if Entry != None:
-                if not Entry.IsLoaded: Entry.Load()
-                #BlendImageToStingrayTexture(bpy.data.images[str(self.object_id)], Entry.LoadedData)
-                try: BlendImageToStingrayTexture(bpy.data.images[str(self.object_id)], Entry.LoadedData)
-                except: print("Saving Texture, but no blend texture was found, using original"); pass
-                #TODO: allow the user to choose an image, instead of looking for one of the same name
-            Global_TocManager.Save(Entry.FileID, TexID)
-        return{'FINISHED'}
-
-# import texture from archive button
-class SaveTextureFromDDsOperator(Operator, ImportHelper):
-    bl_label = "Save Texture"
-    bl_idname = "helldiver2.texture_savefromdds"
-
-    object_id: StringProperty(options={"HIDDEN"})
-    def execute(self, context):
-        Entry = Global_TocManager.GetEntry(int(self.object_id), TexID)
-        if Entry != None:
-            if len(self.filepath) > 1:
-                # get texture data
-                Entry.Load()
-                StingrayTex = Entry.LoadedData
-                with open(self.filepath, 'r+b') as f:
-                    StingrayTex.FromDDs(f.read())
-                Toc = MemoryStream(IOMode="write")
-                Gpu = MemoryStream(IOMode="write")
-                Stream = MemoryStream(IOMode="write")
-                StingrayTex.Serialize(Toc, Gpu, Stream)
-                # add texture to entry
-                Entry.SetData(Toc.Data, Gpu.Data, Stream.Data, False)
-
-                Global_TocManager.Save(int(self.object_id), TexID)
-        return{'FINISHED'}
-
-####################################################
-#### ---- Stingray Bones Classes/Functions ---- ####
-####################################################
 class StingrayBones:
     def __init__(self):
         self.NumNames = self.NumUnk = 0
@@ -2007,9 +1523,10 @@ def LoadStingrayBones(ID, TocData, GpuData, StreamData, Reload, MakeBlendObject)
     StingrayBonesData.Serialize(MemoryStream(TocData))
     return StingrayBonesData
 
-#############################################################
-#### ---- Stingray Composite Mesh Classes/Functions ---- ####
-#############################################################
+#endregion
+
+#region Classes and Functions: Stingray Composite Meshes
+
 class StingrayCompositeMesh:
     def __init__(self):
         self.unk1 = self.NumExternalMeshes = self.StreamInfoOffset = 0
@@ -2056,22 +1573,18 @@ def LoadStingrayCompositeMesh(ID, TocData, GpuData, StreamData, Reload, MakeBlen
     StingrayCompositeMeshData.Serialize(MemoryStream(TocData), MemoryStream(GpuData))
     return StingrayCompositeMeshData
 
-###################################################
-#### ---- Stingray Mesh Classes/Functions ---- ####
-###################################################
+#endregion
 
-# --------------- #
-# -- Matrix4x4 -- # https://help.autodesk.com/cloudhelp/ENU/Stingray-SDK-Help/engine_c/plugin__api__types_8h.html#line_89
-class StingrayMatrix4x4:
+#region Classes and Functions: Stingray Meshes
+
+class StingrayMatrix4x4: # Matrix4x4: https://help.autodesk.com/cloudhelp/ENU/Stingray-SDK-Help/engine_c/plugin__api__types_8h.html#line_89
     def __init__(self):
         self.v = [float(0)]*16
     def Serialize(self, f):
         self.v = [f.float32(value) for value in self.v]
         return self
 
-# --------------- #
-# -- Matrix3x3 -- # https://help.autodesk.com/cloudhelp/ENU/Stingray-SDK-Help/engine_c/plugin__api__types_8h.html#line_84
-class StingrayMatrix3x3:
+class StingrayMatrix3x3: # Matrix3x3: https://help.autodesk.com/cloudhelp/ENU/Stingray-SDK-Help/engine_c/plugin__api__types_8h.html#line_84
     def __init__(self):
         self.x = [0,0,0]
         self.y = [0,0,0]
@@ -2082,9 +1595,7 @@ class StingrayMatrix3x3:
         self.z = f.vec3_float(self.x)
         return self
 
-# ------------------------------ #
-# -- Stingray Local Transform -- # https://help.autodesk.com/cloudhelp/ENU/Stingray-SDK-Help/engine_c/plugin__api__types_8h.html#line_100
-class StingrayLocalTransform:
+class StingrayLocalTransform: # Stingray Local Transform: https://help.autodesk.com/cloudhelp/ENU/Stingray-SDK-Help/engine_c/plugin__api__types_8h.html#line_100
     def __init__(self):
         self.rot   = StingrayMatrix3x3()
         self.pos   = [0,0,0]
@@ -2097,9 +1608,7 @@ class StingrayLocalTransform:
         self.dummy  = f.float32(self.dummy)
         return self
 
-# -------------------- #
-# -- Transform Info -- # READ ONLY
-class TransformInfo:
+class TransformInfo: # READ ONLY
     def __init__(self):
         self.NumTransforms = 0
         self.Transforms = []
@@ -2110,9 +1619,7 @@ class TransformInfo:
         f.seek(f.tell()+12)
         self.Transforms = [StingrayLocalTransform().Serialize(f) for n in range(self.NumTransforms)]
 
-# ------------------------ #
-# -- Customization Info -- # READ ONLY
-class CustomizationInfo:
+class CustomizationInfo: # READ ONLY
     def __init__(self):
         self.BodyType  = ""
         self.Slot      = ""
@@ -2141,8 +1648,6 @@ class CustomizationInfo:
             self.PieceType = ""
             pass # tehee
 
-# --------------------------------- #
-# -- Stream Component Info Class -- #
 class StreamComponentInfo:
     def __init__(self, type="position", format="float"):
         self.Type   = self.TypeFromName(type)
@@ -2258,8 +1763,6 @@ class StreamComponentInfo:
         else:
             raise Exception("Cannot serialize unknown vertex format: "+str(self.Format))
 
-# --------------------- #
-# -- Bone Info Class -- #
 class BoneInfo:
     def __init__(self):
         self.NumBones = self.unk1 = self.RealIndicesOffset = self.FakeIndicesOffset = self.NumFakeIndices = self.FakeIndicesUnk = 0
@@ -2305,8 +1808,6 @@ class BoneInfo:
         FakeIndex = self.FakeIndices.index(bone_index)
         return self.RealIndices[FakeIndex]
 
-# ----------------------- #
-# -- Stream Info Class -- #
 class StreamInfo:
     def __init__(self):
         self.Components = []
@@ -2354,8 +1855,6 @@ class StreamInfo:
         f.seek(EndOffset)
         return self
 
-# ----------------------------- #
-# -- Mesh Section Info Class -- #
 class MeshSectionInfo:
     def __init__(self, ID=0):
         self.unk1 = self.VertexOffset=self.NumVertices=self.IndexOffset=self.NumIndices=self.unk2 = 0
@@ -2371,9 +1870,6 @@ class MeshSectionInfo:
         self.unk2           = f.uint32(self.unk1)
         return self
 
-
-# --------------------- #
-# -- Mesh Info Class -- #
 class MeshInfo:
     def __init__(self):
         self.unk1 = self.unk3 = self.unk4 = self.TransformIndex = self.LodIndex = self.StreamIndex = self.NumSections = self.unk7 = self.unk8 = self.unk9 = self.NumSections_unk = self.MeshID = 0
@@ -2408,9 +1904,6 @@ class MeshInfo:
     def GetNumVertices(self):
         return self.Sections[0].NumVertices
 
-
-# ---------------- #
-# -- Mesh Class -- #
 class RawMaterialClass:
     DefaultMaterialName    = "StingrayDefaultMaterial"
     DefaultMaterialShortID = 155175220
@@ -2477,6 +1970,7 @@ class RawMeshClass:
             self.VertexUVs.append([[0,0] for n in range(numVertices)])
         for idx in range(numBoneIndices):
             self.VertexBoneIndices.append([[0,0,0,0] for n in range(numVertices)])
+    
     def ReInitVerts(self, numVertices):
         self.VertexPositions    = [[0,0,0] for n in range(numVertices)]
         self.VertexNormals      = [[0,0,0] for n in range(numVertices)]
@@ -2493,9 +1987,6 @@ class RawMeshClass:
         for idx in range(numBoneIndices):
             self.VertexBoneIndices.append([[0,0,0,0] for n in range(numVertices)])
 
-
-# ------------------------------ #
-# -- Stingray Mesh File Class -- #
 class StingrayMeshFile:
     def __init__(self):
         self.HeaderData1        = bytearray(28);  self.HeaderData2        = bytearray(20); self.UnReversedData1  = bytearray(); self.UnReversedData2    = bytearray()
@@ -2514,7 +2005,6 @@ class StingrayMeshFile:
     def Serialize(self, f, gpu, redo_offsets = False):
         print("Serialize")
         if f.IsWriting() and not redo_offsets:
-
             # duplicate bone info sections if needed
             temp_boneinfos = [None for n in range(len(self.BoneInfoArray))]
             for Raw_Mesh in self.RawMeshes:
@@ -2526,26 +2016,6 @@ class StingrayMeshFile:
                 BoneInfoIdx     = Raw_Mesh.DEV_BoneInfoIndex
                 temp_boneinfos[RealBoneInfoIdx] = self.BoneInfoArray[BoneInfoIdx]
             self.BoneInfoArray = temp_boneinfos
-            #_____________________________________________________________________________________________#
-            # ---- Most of this code below is to allow removing meshes, which is no longer supported ---- #
-            if False: # disabled for now
-                # set correct number of streams
-                final_streams = []
-                for mesh in self.MeshInfoArray:
-                    if self.StreamInfoArray[mesh.StreamIndex] not in final_streams:
-                        final_streams.append(self.StreamInfoArray[mesh.StreamIndex])
-                self.StreamInfoArray = final_streams
-                # set correct number of bone infos
-                if False: # disabled due to breaking the duplicate bone info method thing
-                    final_boneinfos = []
-                    for Raw_Mesh in self.RawMeshes:
-                        BoneInfoIdx = Raw_Mesh.MeshInfoIndex
-                        if self.BoneInfoArray[BoneInfoIdx] not in final_boneinfos:
-                            final_boneinfos.append(self.BoneInfoArray[BoneInfoIdx])
-                    self.BoneInfoArray = final_boneinfos
-
-            #_______________________________________________#
-            # ---- deal with setting up material stuff ---- #
             print("setting up materials: ")
             self.SectionsIDs = []
             self.MaterialIDs = []
@@ -2736,7 +2206,6 @@ class StingrayMeshFile:
             self.Serialize(f, gpu, True)
         return self
 
-    # -- Serialize GPU Data -- #
     def SerializeGpuData(self, gpu):
         print("SerializeGpuData")
         # Init Raw Meshes If Reading
@@ -2758,7 +2227,6 @@ class StingrayMeshFile:
                 self.SerializeVertexBuffer(gpu, Stream_Info, stream_idx, OrderedMeshes)
                 self.SerializeIndexBuffer(gpu, Stream_Info, stream_idx, OrderedMeshes)
 
-    # -- Serialize GPU Data -- #
     def SerializeIndexBuffer(self, gpu, Stream_Info, stream_idx, OrderedMeshes):
         # get indices
         IndexOffset  = 0
@@ -2828,7 +2296,6 @@ class StingrayMeshFile:
                         Section.NumVertices = RealNumVerts
                     self.ReInitRawMeshVerts()
 
-    # -- Serialize GPU Data -- #
     def SerializeVertexBuffer(self, gpu, Stream_Info, stream_idx, OrderedMeshes):
         # Vertex Buffer
         VertexOffset = 0
@@ -2903,7 +2370,6 @@ class StingrayMeshFile:
             Stream_Info.VertexBufferSize    = gpu.tell() - Stream_Info.VertexBufferOffset
             Stream_Info.NumVertices         = VertexOffset
 
-    # -- Helper Function -- #
     def CreateOrderedMeshList(self):
         # re-order the meshes to match the vertex order (this is mainly for writing)
         # man this code is ass, there has to be a better way to do this, but i am stupid af frfr no cap
@@ -2945,7 +2411,6 @@ class StingrayMeshFile:
                     Stream_Info.IndexBuffer_Type = 1
         return OrderedMeshes
 
-    # -- Helper Function -- #
     def InitRawMeshes(self):
         for n in range(len(self.MeshInfoArray)):
             NewMesh     = RawMeshClass()
@@ -2967,12 +2432,12 @@ class StingrayMeshFile:
                     numBoneIndices += 1
             NewMesh.InitBlank(Mesh_Info.GetNumVertices(), Mesh_Info.GetNumIndices(), numUVs, numBoneIndices)
             self.RawMeshes.append(NewMesh)
+    
     def ReInitRawMeshVerts(self):
         for mesh in self.RawMeshes:
             Mesh_Info = self.MeshInfoArray[self.DEV_MeshInfoMap[mesh.MeshInfoIndex]]
             mesh.ReInitVerts(Mesh_Info.GetNumVertices())
 
-    # -- Helper Function -- #
     def SetupRawMeshComponents(self, OrderedMeshes):
         for stream_idx in range(len(OrderedMeshes)):
             Stream_Info = self.StreamInfoArray[stream_idx]
@@ -2998,8 +2463,7 @@ class StingrayMeshFile:
             if IsSkinned and NumBoneIndices > 1 and bpy.context.scene.Hd2ToolPanelSettings.Force1Group:
                 NumBoneIndices = 1
 
-            # fill default values for meshes which are missing some components
-            for mesh in OrderedMeshes[stream_idx][0]:
+            for mesh in OrderedMeshes[stream_idx][0]: # fill default values for meshes which are missing some components
                 if not len(mesh.VertexPositions)  > 0:
                     raise Exception("bruh... your mesh doesn't have any vertices")
                 if HasNormals and not len(mesh.VertexNormals)    > 0:
@@ -3021,8 +2485,6 @@ class StingrayMeshFile:
             Stream_Info.Components = []
             if HasPositions:  Stream_Info.Components.append(StreamComponentInfo("position", "vec3_float"))
             if HasNormals:    Stream_Info.Components.append(StreamComponentInfo("normal", "unk_normal"))
-            #if HasBiTangents: Stream_Info.Components.append(StreamComponentInfo("bitangent", "vec4_half"))
-            #if HasTangents:   Stream_Info.Components.append(StreamComponentInfo("tangent", "vec4_half"))
             for n in range(NumUVs):
                 UVComponent = StreamComponentInfo("uv", "vec2_half")
                 UVComponent.Index = n
@@ -3036,9 +2498,6 @@ class StingrayMeshFile:
             Stream_Info.VertexStride = 0
             for Component in Stream_Info.Components:
                 Stream_Info.VertexStride += Component.GetSize()
-
-# ------------------------- #
-# -- Mesh Load Functions -- #
 
 def LoadStingrayMesh(ID, TocData, GpuData, StreamData, Reload, MakeBlendObject):
     toc  = MemoryStream(TocData)
@@ -3054,7 +2513,6 @@ def SaveStingrayMesh(ID, TocData, GpuData, StreamData, StingrayMesh):
         for n in range(len(StingrayMesh.RawMeshes)):
             if StingrayMesh.RawMeshes[n].MeshInfoIndex == mesh.MeshInfoIndex:
                 FinalMeshes[n] = mesh
-    # Propagate lods
     if bpy.context.scene.Hd2ToolPanelSettings.AutoLods:
         lod0 = None
         for mesh in FinalMeshes:
@@ -3067,15 +2525,236 @@ def SaveStingrayMesh(ID, TocData, GpuData, StreamData, StingrayMesh):
                     newmesh = copy.deepcopy(lod0)
                     newmesh.MeshInfoIndex = FinalMeshes[n].MeshInfoIndex
                     FinalMeshes[n] = newmesh
-
     StingrayMesh.RawMeshes = FinalMeshes
-
     toc  = MemoryStream(IOMode = "write")
     gpu  = MemoryStream(IOMode = "write")
     StingrayMesh.Serialize(toc, gpu)
     return [toc.Data, gpu.Data, b""]
 
-# import mesh from archive button
+#endregion
+
+#region Operators: Archives & Patches
+
+class LoadArchiveOperator(Operator, ImportHelper):
+    bl_label = "Load Archive"
+    bl_idname = "helldiver2.archive_import"
+
+    filter_glob: StringProperty(default='*', options={'HIDDEN'})
+
+    is_patch: BoolProperty(name="is_patch", default=False, options={'HIDDEN'})
+
+    def execute(self, context):
+        Global_TocManager.LoadArchive(self.filepath, True, self.is_patch)
+        return{'FINISHED'}
+
+class UnloadArchivesOperator(Operator):
+    bl_label = "Unload Archives"
+    bl_idname = "helldiver2.archive_unloadall"
+
+    def execute(self, context):
+        Global_TocManager.UnloadArchives()
+        return{'FINISHED'}
+
+class CreatePatchFromActiveOperator(Operator):
+    bl_label = "Create Patch"
+    bl_idname = "helldiver2.archive_createpatch"
+
+    def execute(self, context):
+        Global_TocManager.CreatePatchFromActive()
+        return{'FINISHED'}
+
+class PatchArchiveOperator(Operator):
+    bl_label = "Patch Archive"
+    bl_idname = "helldiver2.archive_export"
+
+    def execute(self, context):
+        global Global_TocManager
+        Global_TocManager.PatchActiveArchive()
+        return{'FINISHED'}
+
+#endregion
+
+#region Operators: Entries
+
+class ArchiveEntryOperator(Operator):
+    bl_label  = "Archive Entry"
+    bl_idname = "helldiver2.archive_entry"
+
+    object_id: StringProperty()
+    object_typeid: StringProperty()
+    def execute(self, context):
+        return{'FINISHED'}
+
+    def invoke(self, context, event):
+        Entry = Global_TocManager.GetEntry(int(self.object_id), int(self.object_typeid))
+        if event.ctrl:
+            if Entry.IsSelected:
+                Global_TocManager.DeselectEntries([Entry])
+            else:
+                Global_TocManager.SelectEntries([Entry], True)
+            return {'FINISHED'}
+        if event.shift:
+            if Global_TocManager.LastSelected != None:
+                LastSelected = Global_TocManager.LastSelected
+                StartIndex   = LastSelected.DEV_DrawIndex
+                EndIndex     = Entry.DEV_DrawIndex
+                Global_TocManager.DeselectAll()
+                Global_TocManager.LastSelected = LastSelected
+                if StartIndex > EndIndex:
+                    Global_TocManager.SelectEntries(Global_TocManager.DrawChain[EndIndex:StartIndex+1], True)
+                else:
+                    Global_TocManager.SelectEntries(Global_TocManager.DrawChain[StartIndex:EndIndex+1], True)
+            else:
+                Global_TocManager.SelectEntries([Entry], True)
+            return {'FINISHED'}
+
+        Global_TocManager.SelectEntries([Entry])
+        return {'FINISHED'}
+
+class AddEntryToPatchOperator(Operator):
+    bl_label = "Add Entry To Patch"
+    bl_idname = "helldiver2.archive_addtopatch"
+
+    object_id: StringProperty()
+    object_typeid: StringProperty()
+    def execute(self, context):
+        Entries = EntriesFromStrings(self.object_id, self.object_typeid)
+        for Entry in Entries:
+            Global_TocManager.AddEntryToPatch(Entry.FileID, Entry.TypeID)
+        return{'FINISHED'}
+
+class RemoveEntryFromPatchOperator(Operator):
+    bl_label = "Remove Entry From Patch"
+    bl_idname = "helldiver2.archive_removefrompatch"
+
+    object_id: StringProperty()
+    object_typeid: StringProperty()
+    def execute(self, context):
+        Entries = EntriesFromStrings(self.object_id, self.object_typeid)
+        for Entry in Entries:
+            Global_TocManager.RemoveEntryFromPatch(Entry.FileID, Entry.TypeID)
+        return{'FINISHED'}
+
+class UndoArchiveEntryModOperator(Operator):
+    bl_label = "Remove Modifications"
+    bl_idname = "helldiver2.archive_undo_mod"
+
+    object_id: StringProperty()
+    object_typeid: StringProperty()
+    def execute(self, context):
+        Entries = EntriesFromStrings(self.object_id, self.object_typeid)
+        for Entry in Entries:
+            if Entry != None:
+                Entry.UndoModifiedData()
+        return{'FINISHED'}
+
+class DuplicateEntryOperator(Operator):
+    bl_label = "Duplicate Entry"
+    bl_idname = "helldiver2.archive_duplicate"
+
+    NewFileID : StringProperty(name="NewFileID", default="")
+    def draw(self, context):
+        layout = self.layout; row = layout.row()
+        row.prop(self, "NewFileID", icon='COPY_ID')
+
+    object_id: StringProperty()
+    object_typeid: StringProperty()
+    def execute(self, context):
+        Global_TocManager.DuplicateEntry(int(self.object_id), int(self.object_typeid), int(self.NewFileID))
+        return{'FINISHED'}
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self)
+
+class RenamePatchEntryOperator(Operator):
+    bl_label = "Rename Entry"
+    bl_idname = "helldiver2.archive_entryrename"
+
+    NewFileID : StringProperty(name="NewFileID", default="")
+    def draw(self, context):
+        layout = self.layout; row = layout.row()
+        row.prop(self, "NewFileID", icon='COPY_ID')
+
+    object_id: StringProperty()
+    object_typeid: StringProperty()
+    def execute(self, context):
+        Entry = Global_TocManager.GetPatchEntry_B(int(self.object_id), int(self.object_typeid))
+        if Entry == None:
+            raise Exception("Entry does not exist in patch (cannot rename non patch entries)")
+        if Entry != None and self.NewFileID != "":
+            Entry.FileID = int(self.NewFileID)
+        return{'FINISHED'}
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self)
+
+class DumpArchiveObjectOperator(Operator):
+    bl_label = "Dump Archive Object"
+    bl_idname = "helldiver2.archive_object_dump_export"
+
+    directory: StringProperty(name="Outdir Path",description="dump output dir")
+    filter_folder: BoolProperty(default=True,options={"HIDDEN"})
+
+    object_id: StringProperty(options={"HIDDEN"})
+    object_typeid: StringProperty(options={"HIDDEN"})
+    def execute(self, context):
+        Entries = EntriesFromStrings(self.object_id, self.object_typeid)
+        for Entry in Entries:
+            if Entry != None:
+                data = Entry.GetData()
+                FileName = str(Entry.FileID)+"."+GetTypeNameFromID(Entry.TypeID)
+                with open(self.directory + FileName, 'w+b') as f:
+                    f.write(data[0])
+                if data[1] != b"":
+                    with open(self.directory + FileName+".gpu", 'w+b') as f:
+                        f.write(data[1])
+                if data[2] != b"":
+                    with open(self.directory + FileName+".stream", 'w+b') as f:
+                        f.write(data[2])
+        return{'FINISHED'}
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+class ImportDumpOperator(Operator, ImportHelper):
+    bl_label = "Import Dump"
+    bl_idname = "helldiver2.archive_object_dump_import"
+
+    object_id: StringProperty(options={"HIDDEN"})
+    object_typeid: StringProperty(options={"HIDDEN"})
+
+    def execute(self, context):
+        if Global_TocManager.ActivePatch == None:
+            raise Exception("No patch exists, please create one first")
+
+        FileID = int(self.object_id.split(',')[0])
+        Entry = Global_TocManager.GetEntry(FileID, MaterialID)
+        if Entry != None:
+            if not Entry.IsLoaded: Entry.Load(False, False)
+            path = self.filepath
+            with open(path, 'r+b') as f:
+                Entry.TocData = f.read()
+            if os.path.isfile(f"{path}.gpu_resources"):
+                with open(f"{path}.gpu_resources", 'r+b') as f:
+                    Entry.GpuData = f.read()
+            else:
+                Entry.GpuData = b""
+            if os.path.isfile(f"{path}.stream"):
+                with open(f"{path}.stream", 'r+b') as f:
+                    Entry.StreamData = f.read()
+            else:
+                Entry.StreamData = b""
+            Entry.IsModified = True
+            Global_TocManager.AddEntryToPatch(Entry.FileID, Entry.TypeID)
+        return{'FINISHED'}
+
+#endregion
+
+#region Operators: Meshes
+
 class ImportStingrayMeshOperator(Operator):
     bl_label = "Import Archive Mesh"
     bl_idname = "helldiver2.archive_mesh_import"
@@ -3103,7 +2782,6 @@ class ImportStingrayMeshOperator(Operator):
             raise Exception("One or more meshes failed to load")
         return{'FINISHED'}
 
-# save mesh to archive button
 class SaveStingrayMeshOperator(Operator):
     bl_label  = "Save Mesh"
     bl_idname = "helldiver2.archive_mesh_save"
@@ -3113,7 +2791,6 @@ class SaveStingrayMeshOperator(Operator):
         Global_TocManager.Save(int(self.object_id), MeshID)
         return{'FINISHED'}
 
-# batch save mesh to archive button
 class BatchSaveStingrayMeshOperator(Operator):
     bl_label  = "Save Meshes"
     bl_idname = "helldiver2.archive_mesh_batchsave"
@@ -3139,9 +2816,251 @@ class BatchSaveStingrayMeshOperator(Operator):
             Global_TocManager.Save(int(ID), MeshID)
         return{'FINISHED'}
 
-######################################
-#### ---- Archive Search GUI ---- ####
-######################################
+#endregion
+
+#region Operators: Textures
+
+# save texture from blender to archive button
+class SaveTextureFromBlendImageOperator(Operator):
+    bl_label = "Save Texture"
+    bl_idname = "helldiver2.texture_saveblendimage"
+
+    object_id: StringProperty()
+    def execute(self, context):
+        Entries = EntriesFromString(self.object_id, TexID)
+        for Entry in Entries:
+            if Entry != None:
+                if not Entry.IsLoaded: Entry.Load()
+                #BlendImageToStingrayTexture(bpy.data.images[str(self.object_id)], Entry.LoadedData)
+                try: BlendImageToStingrayTexture(bpy.data.images[str(self.object_id)], Entry.LoadedData)
+                except: print("Saving Texture, but no blend texture was found, using original"); pass
+                #TODO: allow the user to choose an image, instead of looking for one of the same name
+            Global_TocManager.Save(Entry.FileID, TexID)
+        return{'FINISHED'}
+
+# import texture from archive button
+class ImportTextureOperator(Operator):
+    bl_label = "Import Texture"
+    bl_idname = "helldiver2.texture_import"
+
+    object_id: StringProperty()
+    def execute(self, context):
+        EntriesIDs = IDsFromString(self.object_id)
+        for EntryID in EntriesIDs:
+            Global_TocManager.Load(int(EntryID), TexID)
+        return{'FINISHED'}
+
+# export texture to file
+class ExportTextureOperator(Operator, ExportHelper):
+    bl_label = "Export Texture"
+    bl_idname = "helldiver2.texture_export"
+    filename_ext = ".dds"
+
+    object_id: StringProperty(options={"HIDDEN"})
+    def execute(self, context):
+        Entry = Global_TocManager.GetEntry(int(self.object_id), TexID)
+        if Entry != None:
+            data = Entry.Load(False, False)
+            with open(self.filepath, 'w+b') as f:
+                f.write(Entry.LoadedData.ToDDs())
+        return{'FINISHED'}
+
+# batch export texture to file
+class BatchExportTextureOperator(Operator):
+    bl_label = "Export Textures"
+    bl_idname = "helldiver2.texture_batchexport"
+    filename_ext = ".dds"
+
+    directory: StringProperty(name="Outdir Path",description="dds output dir")
+    filter_folder: BoolProperty(default=True,options={"HIDDEN"})
+
+    object_id: StringProperty(options={"HIDDEN"})
+    def execute(self, context):
+        EntriesIDs = IDsFromString(self.object_id)
+        for EntryID in EntriesIDs:
+            Entry = Global_TocManager.GetEntry(EntryID, TexID)
+            if Entry != None:
+                data = Entry.Load(False, False)
+                with open(self.directory + str(Entry.FileID)+".dds", 'w+b') as f:
+                    f.write(Entry.LoadedData.ToDDs())
+        return{'FINISHED'}
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+# import texture from archive button
+class SaveTextureFromDDsOperator(Operator, ImportHelper):
+    bl_label = "Save Texture"
+    bl_idname = "helldiver2.texture_savefromdds"
+
+    object_id: StringProperty(options={"HIDDEN"})
+    def execute(self, context):
+        Entry = Global_TocManager.GetEntry(int(self.object_id), TexID)
+        if Entry != None:
+            if len(self.filepath) > 1:
+                # get texture data
+                Entry.Load()
+                StingrayTex = Entry.LoadedData
+                with open(self.filepath, 'r+b') as f:
+                    StingrayTex.FromDDs(f.read())
+                Toc = MemoryStream(IOMode="write")
+                Gpu = MemoryStream(IOMode="write")
+                Stream = MemoryStream(IOMode="write")
+                StingrayTex.Serialize(Toc, Gpu, Stream)
+                # add texture to entry
+                Entry.SetData(Toc.Data, Gpu.Data, Stream.Data, False)
+
+                Global_TocManager.Save(int(self.object_id), TexID)
+        return{'FINISHED'}
+
+#endregion
+
+#region Operators: Materials
+
+class SaveMaterialOperator(Operator):
+    bl_label = "Save Material"
+    bl_idname = "helldiver2.material_save"
+
+    object_id: StringProperty()
+    def execute(self, context):
+        EntriesIDs = IDsFromString(self.object_id)
+        for EntryID in EntriesIDs:
+            Global_TocManager.Save(int(EntryID), MaterialID)
+        return{'FINISHED'}
+
+class ImportMaterialOperator(Operator):
+    bl_label = "Import Material"
+    bl_idname = "helldiver2.material_import"
+
+    object_id: StringProperty()
+    def execute(self, context):
+        EntriesIDs = IDsFromString(self.object_id)
+        for EntryID in EntriesIDs:
+            Global_TocManager.Load(int(EntryID), MaterialID)
+        return{'FINISHED'}
+
+class AddMaterialOperator(Operator):
+    bl_label = "Add Material"
+    bl_idname = "helldiver2.material_add"
+
+    materials = (
+        ("basic.dat", "Basic", "The default template derived from the material used for bugs. Viable for use on pretty much anything if you aren't seeking the highest fidelity."),
+        ("test.dat", "Test", "TEST"),
+    )
+
+    selected_material: EnumProperty(items=materials, name="Template")
+
+    def execute(self, context):
+        Entry = TocEntry()
+        Entry.FileID = r.randint(1, 0xffffffffffffffff)
+        Entry.TypeID = MaterialID
+        Entry.IsCreated = True
+        with open(f"{Global_materialpath}\\{self.selected_material}", 'r+b') as f:
+            data = f.read()
+        Entry.TocData_OLD   = data
+        Entry.TocData       = data
+
+        Global_TocManager.AddNewEntryToPatch(Entry)
+        return{'FINISHED'}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+class ShowMaterialEditorOperator(Operator):
+    bl_label = "Show Material Editor"
+    bl_idname = "helldiver2.material_showeditor"
+
+    object_id: StringProperty()
+    def execute(self, context):
+        Entry = Global_TocManager.GetEntry(int(self.object_id), MaterialID)
+        if Entry != None:
+            if not Entry.IsLoaded: Entry.Load(False, False)
+            mat = Entry.LoadedData
+            if mat.DEV_ShowEditor:
+                print("MakeFalse")
+                mat.DEV_ShowEditor = False
+            else:
+                print("MakeTrue")
+                mat.DEV_ShowEditor = True
+        return{'FINISHED'}
+
+class SetMaterialTexture(Operator, ImportHelper):
+    bl_label = "Set Material Texture"
+    bl_idname = "helldiver2.material_settex"
+
+    filename_ext = ".dds"
+
+    filter_glob: StringProperty(default="*.dds", options={'HIDDEN'})
+
+    object_id: StringProperty(options={"HIDDEN"})
+    tex_idx: IntProperty(options={"HIDDEN"})
+
+    def execute(self, context):
+        Entry = Global_TocManager.GetEntry(int(self.object_id), MaterialID)
+        if Entry != None:
+            if Entry.IsLoaded:
+                Entry.LoadedData.DEV_DDSPaths[self.tex_idx] = self.filepath
+        return{'FINISHED'}
+
+#endregion
+
+#region Operators: Clipboard Functionality
+
+class CopyArchiveEntryOperator(Operator):
+    bl_label = "Copy Entry"
+    bl_idname = "helldiver2.archive_copy"
+
+    object_id: StringProperty()
+    object_typeid: StringProperty()
+    def execute(self, context):
+        Entries = EntriesFromStrings(self.object_id, self.object_typeid)
+        Global_TocManager.Copy(Entries)
+        return{'FINISHED'}
+
+class PasteArchiveEntryOperator(Operator):
+    bl_label = "Paste Entry"
+    bl_idname = "helldiver2.archive_paste"
+
+    def execute(self, context):
+        Global_TocManager.Paste()
+        return{'FINISHED'}
+
+class ClearClipboardOperator(Operator):
+    bl_label = "Clear Clipboard"
+    bl_idname = "helldiver2.archive_clearclipboard"
+
+    def execute(self, context):
+        Global_TocManager.ClearClipboard()
+        return{'FINISHED'}
+
+class CopyTextOperator(Operator):
+    bl_label  = "Copy ID"
+    bl_idname = "helldiver2.copytest"
+
+    text: StringProperty()
+    def execute(self, context):
+        cmd='echo '+str(self.text).strip()+'|clip'
+        subprocess.check_call(cmd, shell=True)
+        return{'FINISHED'}
+
+#endregion
+
+#region Operators: UI/UX
+
+class LoadArchivesOperator(Operator):
+    bl_label = "Load Archives"
+    bl_idname = "helldiver2.archives_import"
+
+    paths_str: StringProperty(name="paths_str")
+    def execute(self, context):
+        global Global_TocManager
+        paths = self.paths_str.split(',')
+        for path in paths:
+            if path != "" and os.path.exists(path):
+                Global_TocManager.LoadArchive(path)
+        self.paths = []
+        return{'FINISHED'}
 
 class SearchArchivesOperator(Operator):
     bl_label = "Search All Archives"
@@ -3209,11 +3128,6 @@ class SearchArchivesOperator(Operator):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
-#######################################
-#### ---- Extra GUI Functions ---- ####
-#######################################
-
-# Copy Text
 class SelectAllOfTypeOperator(Operator):
     bl_label  = "Select All Of Type"
     bl_idname = "helldiver2.select_type"
@@ -3232,28 +3146,43 @@ class SelectAllOfTypeOperator(Operator):
                     Global_TocManager.SelectEntries([Entry], True)
         return{'FINISHED'}
 
-# Copy Text
-class CopyTextOperator(Operator):
-    bl_label  = "Copy ID"
-    bl_idname = "helldiver2.copytest"
+class SetEntryFriendlyNameOperator(Operator):
+    bl_label = "Set Friendly Name"
+    bl_idname = "helldiver2.archive_setfriendlyname"
 
-    text: StringProperty()
+    NewFriendlyName : StringProperty(name="NewFriendlyName", default="")
+    def draw(self, context):
+        layout = self.layout; row = layout.row()
+        row.prop(self, "NewFriendlyName", icon='COPY_ID')
+        row = layout.row()
+        if Hash64(str(self.NewFriendlyName)) == int(self.object_id):
+            row.label(text="Hash is correct")
+        else:
+            row.label(text="Hash is incorrect")
+        row.label(text=str(Hash64(str(self.NewFriendlyName))))
+
+    object_id: StringProperty()
     def execute(self, context):
-        cmd='echo '+str(self.text).strip()+'|clip'
-        subprocess.check_call(cmd, shell=True)
+        AddFriendlyName(int(self.object_id), str(self.NewFriendlyName))
         return{'FINISHED'}
 
-# Open documentation
+    def invoke(self, context, event):
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self)
+
+#endregion
+
+#region Operators: Help
+
 class HelpOperator(Operator):
     bl_label  = "Help"
     bl_idname = "helldiver2.help"
 
     def execute(self, context):
-        url = "https://docs.google.com/document/d/1SF7iEekmxoDdf0EsJu1ww9u2Cr8vzHyn2ycZS7JlWl0/edit#heading=h.gv4shgb4on0i"
+        url = "https://docs.google.com/document/d/1SF7iEekmxoDdf0EsJu1ww9u2Cr8vzHyn2ycZS7JlWl0"
         webbrowser.open(url, new=0, autoraise=True)
         return{'FINISHED'}
 
-# Open Archive Spreadsheet
 class ArchiveSpreadsheetOperator(Operator):
     bl_label  = "Archive Spreadsheet"
     bl_idname = "helldiver2.archive_spreadsheet"
@@ -3263,248 +3192,16 @@ class ArchiveSpreadsheetOperator(Operator):
         webbrowser.open(url, new=0, autoraise=True)
         return{'FINISHED'}
 
-class ArchiveEntryOperator(Operator):
-    bl_label  = "Archive Entry"
-    bl_idname = "helldiver2.archive_entry"
+#endregion
 
-    object_id: StringProperty()
-    object_typeid: StringProperty()
-    def execute(self, context):
-        return{'FINISHED'}
-
-    def invoke(self, context, event):
-        Entry = Global_TocManager.GetEntry(int(self.object_id), int(self.object_typeid))
-        if event.ctrl:
-            if Entry.IsSelected:
-                Global_TocManager.DeselectEntries([Entry])
-            else:
-                Global_TocManager.SelectEntries([Entry], True)
-            return {'FINISHED'}
-        if event.shift:
-            if Global_TocManager.LastSelected != None:
-                LastSelected = Global_TocManager.LastSelected
-                StartIndex   = LastSelected.DEV_DrawIndex
-                EndIndex     = Entry.DEV_DrawIndex
-                Global_TocManager.DeselectAll()
-                Global_TocManager.LastSelected = LastSelected
-                if StartIndex > EndIndex:
-                    Global_TocManager.SelectEntries(Global_TocManager.DrawChain[EndIndex:StartIndex+1], True)
-                else:
-                    Global_TocManager.SelectEntries(Global_TocManager.DrawChain[StartIndex:EndIndex+1], True)
-            else:
-                Global_TocManager.SelectEntries([Entry], True)
-            return {'FINISHED'}
-
-        Global_TocManager.SelectEntries([Entry])
-        return {'FINISHED'}
-
-class WM_MT_button_context(Menu):
-    bl_label = "Entry Context Menu"
-
-    def draw(self, context):
-        value = getattr(context, "button_operator", None)
-        if type(value).__name__ == "HELLDIVER2_OT_archive_entry":
-            layout = self.layout
-            FileID = getattr(value, "object_id")
-            TypeID = getattr(value, "object_typeid")
-            DrawEntryButtons(layout, Global_TocManager.GetEntry(int(FileID), int(TypeID)))
-
-def GetDisplayData():
-    # Set display archive TODO: Global_TocManager.LastSelected Draw Index could be wrong if we switch to patch only mode, that should be fixed
-    DisplayTocEntries = []
-    DisplayTocTypes   = []
-    DisplayArchive = Global_TocManager.ActiveArchive
-    if bpy.context.scene.Hd2ToolPanelSettings.PatchOnly:
-        if Global_TocManager.ActivePatch != None:
-            DisplayTocEntries = [[Entry, True] for Entry in Global_TocManager.ActivePatch.TocEntries]
-            DisplayTocTypes   = Global_TocManager.ActivePatch.TocTypes
-    elif Global_TocManager.ActiveArchive != None:
-        DisplayTocEntries = [[Entry, False] for Entry in Global_TocManager.ActiveArchive.TocEntries]
-        DisplayTocTypes   = [Type for Type in Global_TocManager.ActiveArchive.TocTypes]
-        AddedTypes   = [Type.TypeID for Type in DisplayTocTypes]
-        AddedEntries = [Entry[0].FileID for Entry in DisplayTocEntries]
-        if Global_TocManager.ActivePatch != None:
-            for Type in Global_TocManager.ActivePatch.TocTypes:
-                if Type.TypeID not in AddedTypes:
-                    AddedTypes.append(Type.TypeID)
-                    DisplayTocTypes.append(Type)
-            for Entry in Global_TocManager.ActivePatch.TocEntries:
-                if Entry.FileID not in AddedEntries:
-                    AddedEntries.append(Entry.FileID)
-                    DisplayTocEntries.append([Entry, True])
-    return [DisplayTocEntries, DisplayTocTypes]
-
-################################################
-#### ---- Entry Buttons Draw Functions ---- ####
-################################################
-
-def DrawEntryButtonsSimple(box, row, Entry, PatchOnly):
-    if Entry.TypeID == MeshID:
-        row.operator("helldiver2.archive_mesh_save", icon='FILE_BLEND', text="").object_id = str(Entry.FileID)
-        row.operator("helldiver2.archive_mesh_import", icon='IMPORT', text="").object_id = str(Entry.FileID)
-    elif Entry.TypeID == TexID:
-        row.operator("helldiver2.texture_saveblendimage", icon='FILE_BLEND', text="").object_id = str(Entry.FileID)
-        row.operator("helldiver2.texture_import", icon='IMPORT', text="").object_id = str(Entry.FileID)
-    elif Entry.TypeID == MaterialID:
-        row.operator("helldiver2.material_save", icon='FILE_BLEND', text="").object_id = str(Entry.FileID)
-        row.operator("helldiver2.material_import", icon='IMPORT', text="").object_id = str(Entry.FileID)
-        DrawMaterialEditor(Entry, box, row)
-    if Global_TocManager.IsInPatch(Entry):
-        props = row.operator("helldiver2.archive_removefrompatch", icon='FAKE_USER_ON', text="")
-        props.object_id     = str(Entry.FileID)
-        props.object_typeid = str(Entry.TypeID)
-    else:
-        props = row.operator("helldiver2.archive_addtopatch", icon='FAKE_USER_OFF', text="")
-        props.object_id     = str(Entry.FileID)
-        props.object_typeid = str(Entry.TypeID)
-    if Entry.IsModified:
-        props = row.operator("helldiver2.archive_undo_mod", icon='TRASH', text="")
-        props.object_id     = str(Entry.FileID)
-        props.object_typeid = str(Entry.TypeID)
-    if PatchOnly:
-        props = row.operator("helldiver2.archive_removefrompatch", icon='X', text="")
-        props.object_id     = str(Entry.FileID)
-        props.object_typeid = str(Entry.TypeID)
-
-# For context menu
-def DrawEntryButtons(row, Entry):
-    #TODO: Figure out how to redraw gui panel to update it
-    if not Entry.IsSelected:
-        Global_TocManager.SelectEntries([Entry])
-
-    # Combine entry strings to be passed to operators
-    FileIDStr = ""
-    TypeIDStr = ""
-    for SelectedEntry in Global_TocManager.SelectedEntries:
-        FileIDStr += str(SelectedEntry.FileID)+","
-        TypeIDStr += str(SelectedEntry.TypeID)+","
-    # Get common class
-    AreAllMeshes    = True
-    AreAllTextures  = True
-    AreAllMaterials = True
-    SingleEntry = True
-    NumSelected = len(Global_TocManager.SelectedEntries)
-    if len(Global_TocManager.SelectedEntries) > 1:
-        SingleEntry = False
-    for SelectedEntry in Global_TocManager.SelectedEntries:
-        if SelectedEntry.TypeID == MeshID:
-            AreAllTextures = False
-            AreAllMaterials = False
-        elif SelectedEntry.TypeID == TexID:
-            AreAllMeshes = False
-            AreAllMaterials = False
-        elif SelectedEntry.TypeID == MaterialID:
-            AreAllTextures = False
-            AreAllMeshes = False
-    if SingleEntry:
-        RemoveFromPatchName = "Remove From Patch"
-        AddToPatchName = "Add To Patch"
-        ImportMeshName = "Import Mesh"
-        ImportTextureName = "Import Texture"
-        ImportMaterialName = "Import Material"
-        DumpObjectName = "Dump Object"
-        SaveTextureName = "Save Blender Texture"
-        SaveMaterialName = "Save Material"
-        UndoName = "Undo Modifications"
-        CopyName = "Copy Entry"
-    else:
-        RemoveFromPatchName = f"Remove {NumSelected} From Patch"
-        AddToPatchName = f"Add {NumSelected} To Patch"
-        ImportMeshName = f"Import {NumSelected} Meshes"
-        ImportTextureName = f"Import {NumSelected} Textures"
-        ImportMaterialName = f"Import {NumSelected} Materials"
-        DumpObjectName = f"Dump {NumSelected} Objects"
-        SaveTextureName = f"Save Blender {NumSelected} Textures"
-        SaveMaterialName = f"Save {NumSelected} Materials"
-        UndoName = f"Undo {NumSelected} Modifications"
-        CopyName = f"Copy {NumSelected} Entries"
-    # Draw seperator
-    row.separator()
-    row.label(text="---------- HellDivers2 ----------")
-
-    # Draw copy button
-    row.separator()
-    props = row.operator("helldiver2.archive_copy", icon='COPYDOWN', text=CopyName)
-    props.object_id     = FileIDStr
-    props.object_typeid = TypeIDStr
-    if len(Global_TocManager.CopyBuffer) != 0:
-        row.operator("helldiver2.archive_paste", icon='PASTEDOWN', text="Paste "+str(len(Global_TocManager.CopyBuffer))+" Entries")
-        row.operator("helldiver2.archive_clearclipboard", icon='TRASH', text="Clear Clipboard")
-    if SingleEntry:
-        props = row.operator("helldiver2.archive_duplicate", icon='DUPLICATE', text="Duplicate Entry")
-        props.object_id     = str(Entry.FileID)
-        props.object_typeid = str(Entry.TypeID)
-    if Global_TocManager.IsInPatch(Entry):
-        props = row.operator("helldiver2.archive_removefrompatch", icon='X', text=RemoveFromPatchName)
-        props.object_id     = FileIDStr
-        props.object_typeid = TypeIDStr
-    else:
-        props = row.operator("helldiver2.archive_addtopatch", icon='PLUS', text=AddToPatchName)
-        props.object_id     = FileIDStr
-        props.object_typeid = TypeIDStr
-
-    # Draw import buttons
-    # TODO: Add generic import buttons
-    row.separator()
-    if AreAllMeshes:
-        row.operator("helldiver2.archive_mesh_import", icon='IMPORT', text=ImportMeshName).object_id = FileIDStr
-    elif AreAllTextures:
-        row.operator("helldiver2.texture_import", icon='IMPORT', text=ImportTextureName).object_id = FileIDStr
-        if SingleEntry:
-            row.operator("helldiver2.texture_export", icon='EXPORT', text="Export Texture").object_id = str(Entry.FileID)
-        else:
-            row.operator("helldiver2.texture_batchexport", icon='EXPORT', text=f"Export {NumSelected} Textures").object_id = FileIDStr
-    elif AreAllMaterials:
-        row.operator("helldiver2.material_import", icon='IMPORT', text=ImportMaterialName).object_id = FileIDStr
-    # Draw export buttons
-    row.separator()
-    props = row.operator("helldiver2.archive_object_dump_export", icon='PACKAGE', text=DumpObjectName)
-    props.object_id     = FileIDStr
-    props.object_typeid = TypeIDStr
-    # Draw dump import button
-    if AreAllMaterials and SingleEntry: row.operator("helldiver2.archive_object_dump_import", icon="IMPORT", text="Import Raw Dump").object_id = FileIDStr
-    # Draw save buttons
-    row.separator()
-    if AreAllMeshes:
-        if SingleEntry:
-            row.operator("helldiver2.archive_mesh_save", icon='FILE_BLEND', text="Save Mesh").object_id = str(Entry.FileID)
-        else:
-            row.operator("helldiver2.archive_mesh_batchsave", icon='FILE_BLEND', text=f"Save {NumSelected} Meshes")
-    elif AreAllTextures:
-        row.operator("helldiver2.texture_saveblendimage", icon='FILE_BLEND', text=SaveTextureName).object_id = FileIDStr
-        if SingleEntry:
-            row.operator("helldiver2.texture_savefromdds", icon='IMAGE_REFERENCE', text="Save Texture From DDs").object_id = str(Entry.FileID)
-    elif AreAllMaterials: row.operator("helldiver2.material_save", icon='FILE_BLEND', text=SaveMaterialName).object_id = FileIDStr
-    # Draw copy ID buttons
-    if SingleEntry:
-        row.separator()
-        row.operator("helldiver2.copytest", icon='COPY_ID', text="Copy Entry ID").text = str(Entry.FileID)
-        row.operator("helldiver2.copytest", icon='COPY_ID', text="Copy Type ID").text  = str(Entry.TypeID)
-        row.operator("helldiver2.copytest", icon='COPY_ID', text="Copy Friendly Name").text  = GetFriendlyNameFromID(Entry.FileID)
-        if Global_TocManager.IsInPatch(Entry):
-            props = row.operator("helldiver2.archive_entryrename", icon='TEXT', text="Rename")
-            props.object_id     = str(Entry.FileID)
-            props.object_typeid = str(Entry.TypeID)
-    if Entry.IsModified:
-        row.separator()
-        props = row.operator("helldiver2.archive_undo_mod", icon='TRASH', text=UndoName)
-        props.object_id     = FileIDStr
-        props.object_typeid = TypeIDStr
-
-    if SingleEntry:
-        row.operator("helldiver2.archive_setfriendlyname", icon='WORDWRAP_ON', text="Set Friendly Name").object_id = str(Entry.FileID)
-
-    return
-
-
-#######################
-#### ---- GUI ---- ####
-#######################
+#region Menus and Panels
 
 def LoadedArchives_callback(scene, context):
     return [(Archive.Name, Archive.Name, "") for Archive in Global_TocManager.LoadedArchives]
+
 def Patches_callback(scene, context):
     return [(Archive.Name, Archive.Name, "") for Archive in Global_TocManager.Patches]
+
 class Hd2ToolPanelSettings(PropertyGroup):
     # Patches
     Patches   : EnumProperty(name="Patches", items=Patches_callback)
@@ -3529,13 +3226,58 @@ class Hd2ToolPanelSettings(PropertyGroup):
     # Search
     SearchField : StringProperty(default = "")
 
-#UI Panel Class
 class HellDivers2ToolsPanel(Panel):
     bl_label = "Helldivers 2"
     bl_idname = "SF_PT_Tools"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "Modding"
+
+    def draw_material_editor(self, Entry, layout, row):
+        row.operator("helldiver2.material_showeditor", icon='MOD_LINEART', text="").object_id = str(Entry.FileID)
+        if Entry.IsLoaded:
+            mat = Entry.LoadedData
+            if mat.DEV_ShowEditor:
+                for TexIndex in range(len(mat.TexIDs)):
+                    row = layout.row()
+                    row.separator(); row.separator(); row.separator()
+                    textureType = GetTextureTypeFromID(mat.TexIDs[TexIndex])
+                    if mat.DEV_DDSPaths[TexIndex] != None:
+                        filepath = Path(mat.DEV_DDSPaths[TexIndex])
+                        row.label(text=GetTextureTypeFromID(mat.TexIDs[TexIndex])+filepath.name, icon='FILE_IMAGE')
+                    else:
+                        row.label(text=textureType+str(mat.TexIDs[TexIndex]), icon='FILE_IMAGE')
+                    props = row.operator("helldiver2.material_settex", icon='FILEBROWSER', text="")
+                    props.object_id = str(Entry.FileID)
+                    props.tex_idx   = TexIndex
+
+    def draw_entry_buttons(self, box, row, Entry, PatchOnly):
+        if Entry.TypeID == MeshID:
+            row.operator("helldiver2.archive_mesh_save", icon='FILE_BLEND', text="").object_id = str(Entry.FileID)
+            row.operator("helldiver2.archive_mesh_import", icon='IMPORT', text="").object_id = str(Entry.FileID)
+        elif Entry.TypeID == TexID:
+            row.operator("helldiver2.texture_saveblendimage", icon='FILE_BLEND', text="").object_id = str(Entry.FileID)
+            row.operator("helldiver2.texture_import", icon='IMPORT', text="").object_id = str(Entry.FileID)
+        elif Entry.TypeID == MaterialID:
+            row.operator("helldiver2.material_save", icon='FILE_BLEND', text="").object_id = str(Entry.FileID)
+            row.operator("helldiver2.material_import", icon='IMPORT', text="").object_id = str(Entry.FileID)
+            self.draw_material_editor(Entry, box, row)
+        if Global_TocManager.IsInPatch(Entry):
+            props = row.operator("helldiver2.archive_removefrompatch", icon='FAKE_USER_ON', text="")
+            props.object_id     = str(Entry.FileID)
+            props.object_typeid = str(Entry.TypeID)
+        else:
+            props = row.operator("helldiver2.archive_addtopatch", icon='FAKE_USER_OFF', text="")
+            props.object_id     = str(Entry.FileID)
+            props.object_typeid = str(Entry.TypeID)
+        if Entry.IsModified:
+            props = row.operator("helldiver2.archive_undo_mod", icon='TRASH', text="")
+            props.object_id     = str(Entry.FileID)
+            props.object_typeid = str(Entry.TypeID)
+        if PatchOnly:
+            props = row.operator("helldiver2.archive_removefrompatch", icon='X', text="")
+            props.object_id     = str(Entry.FileID)
+            props.object_typeid = str(Entry.TypeID)
 
     def draw(self, context):
         layout = self.layout
@@ -3671,15 +3413,158 @@ class HellDivers2ToolsPanel(Panel):
                     props = row.operator("helldiver2.archive_entry", icon=type_icon, text=FriendlyName, emboss=PatchEntry.IsSelected, depress=PatchEntry.IsSelected)
                     props.object_id     = str(Entry.FileID)
                     props.object_typeid = str(Entry.TypeID)
-                    # Draw Buttons
-                    DrawEntryButtonsSimple(box, row, PatchEntry, PatchOnly)
+                    # Draw Entry Buttons
+                    self.draw_entry_buttons(box, row, PatchEntry, PatchOnly)
                     # Update Draw Chain
                     DrawChain.append(PatchEntry)
             Global_TocManager.DrawChain = DrawChain
         Global_TocManager.SavedFriendlyNames = NewFriendlyNames
         Global_TocManager.SavedFriendlyNameIDs = NewFriendlyIDs
 
-classes_to_register = (
+class WM_MT_button_context(Menu):
+    bl_label = "Entry Context Menu"
+
+    def draw_entry_buttons(self, row, Entry):
+        #TODO: Figure out how to redraw gui panel to update it
+        if not Entry.IsSelected:
+            Global_TocManager.SelectEntries([Entry])
+
+        # Combine entry strings to be passed to operators
+        FileIDStr = ""
+        TypeIDStr = ""
+        for SelectedEntry in Global_TocManager.SelectedEntries:
+            FileIDStr += str(SelectedEntry.FileID)+","
+            TypeIDStr += str(SelectedEntry.TypeID)+","
+        # Get common class
+        AreAllMeshes    = True
+        AreAllTextures  = True
+        AreAllMaterials = True
+        SingleEntry = True
+        NumSelected = len(Global_TocManager.SelectedEntries)
+        if len(Global_TocManager.SelectedEntries) > 1:
+            SingleEntry = False
+        for SelectedEntry in Global_TocManager.SelectedEntries:
+            if SelectedEntry.TypeID == MeshID:
+                AreAllTextures = False
+                AreAllMaterials = False
+            elif SelectedEntry.TypeID == TexID:
+                AreAllMeshes = False
+                AreAllMaterials = False
+            elif SelectedEntry.TypeID == MaterialID:
+                AreAllTextures = False
+                AreAllMeshes = False
+        if SingleEntry:
+            RemoveFromPatchName = "Remove From Patch"
+            AddToPatchName = "Add To Patch"
+            ImportMeshName = "Import Mesh"
+            ImportTextureName = "Import Texture"
+            ImportMaterialName = "Import Material"
+            DumpObjectName = "Dump Object"
+            SaveTextureName = "Save Blender Texture"
+            SaveMaterialName = "Save Material"
+            UndoName = "Undo Modifications"
+            CopyName = "Copy Entry"
+        else:
+            RemoveFromPatchName = f"Remove {NumSelected} From Patch"
+            AddToPatchName = f"Add {NumSelected} To Patch"
+            ImportMeshName = f"Import {NumSelected} Meshes"
+            ImportTextureName = f"Import {NumSelected} Textures"
+            ImportMaterialName = f"Import {NumSelected} Materials"
+            DumpObjectName = f"Dump {NumSelected} Objects"
+            SaveTextureName = f"Save Blender {NumSelected} Textures"
+            SaveMaterialName = f"Save {NumSelected} Materials"
+            UndoName = f"Undo {NumSelected} Modifications"
+            CopyName = f"Copy {NumSelected} Entries"
+        # Draw seperator
+        row.separator()
+        row.label(text="---------- HellDivers2 ----------")
+
+        # Draw copy button
+        row.separator()
+        props = row.operator("helldiver2.archive_copy", icon='COPYDOWN', text=CopyName)
+        props.object_id     = FileIDStr
+        props.object_typeid = TypeIDStr
+        if len(Global_TocManager.CopyBuffer) != 0:
+            row.operator("helldiver2.archive_paste", icon='PASTEDOWN', text="Paste "+str(len(Global_TocManager.CopyBuffer))+" Entries")
+            row.operator("helldiver2.archive_clearclipboard", icon='TRASH', text="Clear Clipboard")
+        if SingleEntry:
+            props = row.operator("helldiver2.archive_duplicate", icon='DUPLICATE', text="Duplicate Entry")
+            props.object_id     = str(Entry.FileID)
+            props.object_typeid = str(Entry.TypeID)
+        
+        # NOTE: Is there really a point to doubling up on operators already present inline with every entry? Numerous occurences of this will be commented out henceforth
+
+        # if Global_TocManager.IsInPatch(Entry):
+        #     props = row.operator("helldiver2.archive_removefrompatch", icon='X', text=RemoveFromPatchName)
+        #     props.object_id     = FileIDStr
+        #     props.object_typeid = TypeIDStr
+        # else:
+        #     props = row.operator("helldiver2.archive_addtopatch", icon='PLUS', text=AddToPatchName)
+        #     props.object_id     = FileIDStr
+        #     props.object_typeid = TypeIDStr
+
+        # Draw import buttons
+        # TODO: Add generic import buttons
+        row.separator()
+        # if AreAllMeshes:
+        #     row.operator("helldiver2.archive_mesh_import", icon='IMPORT', text=ImportMeshName).object_id = FileIDStr
+        if AreAllTextures:
+            # row.operator("helldiver2.texture_import", icon='IMPORT', text=ImportTextureName).object_id = FileIDStr
+            if SingleEntry:
+                row.operator("helldiver2.texture_export", icon='EXPORT', text="Export Texture").object_id = str(Entry.FileID)
+            else:
+                row.operator("helldiver2.texture_batchexport", icon='EXPORT', text=f"Export {NumSelected} Textures").object_id = FileIDStr
+        # elif AreAllMaterials:
+        #     row.operator("helldiver2.material_import", icon='IMPORT', text=ImportMaterialName).object_id = FileIDStr
+        # Draw export buttons
+        row.separator()
+        props = row.operator("helldiver2.archive_object_dump_export", icon='PACKAGE', text=DumpObjectName)
+        props.object_id     = FileIDStr
+        props.object_typeid = TypeIDStr
+        # Draw dump import button
+        if AreAllMaterials and SingleEntry: row.operator("helldiver2.archive_object_dump_import", icon="IMPORT", text="Import Raw Dump").object_id = FileIDStr
+        # Draw save buttons
+        row.separator()
+        if AreAllMeshes and SingleEntry:
+            # if SingleEntry:
+            #     row.operator("helldiver2.archive_mesh_save", icon='FILE_BLEND', text="Save Mesh").object_id = str(Entry.FileID)
+            # else:
+            row.operator("helldiver2.archive_mesh_batchsave", icon='FILE_BLEND', text=f"Save {NumSelected} Meshes")
+        elif AreAllTextures and SingleEntry:
+            # row.operator("helldiver2.texture_saveblendimage", icon='FILE_BLEND', text=SaveTextureName).object_id = FileIDStr
+            # if SingleEntry:
+            row.operator("helldiver2.texture_savefromdds", icon='IMAGE_REFERENCE', text="Save Texture From DDs").object_id = str(Entry.FileID)
+        # elif AreAllMaterials: row.operator("helldiver2.material_save", icon='FILE_BLEND', text=SaveMaterialName).object_id = FileIDStr
+        # Draw copy ID buttons
+        if SingleEntry:
+            row.separator()
+            row.operator("helldiver2.copytest", icon='COPY_ID', text="Copy Entry ID").text = str(Entry.FileID)
+            row.operator("helldiver2.copytest", icon='COPY_ID', text="Copy Type ID").text  = str(Entry.TypeID)
+            row.operator("helldiver2.copytest", icon='COPY_ID', text="Copy Friendly Name").text  = GetFriendlyNameFromID(Entry.FileID)
+            if Global_TocManager.IsInPatch(Entry):
+                props = row.operator("helldiver2.archive_entryrename", icon='TEXT', text="Rename")
+                props.object_id     = str(Entry.FileID)
+                props.object_typeid = str(Entry.TypeID)
+        # if Entry.IsModified:
+        #     row.separator()
+        #     props = row.operator("helldiver2.archive_undo_mod", icon='TRASH', text=UndoName)
+        #     props.object_id     = FileIDStr
+        #     props.object_typeid = TypeIDStr
+
+        if SingleEntry:
+            row.operator("helldiver2.archive_setfriendlyname", icon='WORDWRAP_ON', text="Set Friendly Name").object_id = str(Entry.FileID)
+    
+    def draw(self, context):
+        value = getattr(context, "button_operator", None)
+        if type(value).__name__ == "HELLDIVER2_OT_archive_entry":
+            layout = self.layout
+            FileID = getattr(value, "object_id")
+            TypeID = getattr(value, "object_typeid")
+            self.draw_entry_buttons(layout, Global_TocManager.GetEntry(int(FileID), int(TypeID)))
+
+#endregion
+
+classes = (
     LoadArchiveOperator,
     PatchArchiveOperator,
     ImportStingrayMeshOperator,
@@ -3719,54 +3604,20 @@ classes_to_register = (
     SetEntryFriendlyNameOperator,
 )
 
-def TestTask():
-    strings = []
-    IDs = []
-    path = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Helldivers 2\\data"
-    for root, dirs, files in os.walk(path):
-        for name in files:
-            if Path(name).suffix == "":
-                toc = StreamToc()
-                success = toc.FromFile(os.path.join(root, name))
-                print(path)
-                for Entry in toc.TocEntries:
-                    if Entry.TypeID == 2114929748090776371:
-                        f = MemoryStream(Entry.TocData)
-                        f.seek(80)
-                        string = str(Entry.FileID)+" "+f.bytes(b"", 31).decode()+"\n"
-                        if Entry.FileID in IDs:
-                            strings[IDs.index(Entry.FileID)] = string
-                        else:
-                            strings.append(string)
-                            IDs.append(Entry.FileID)
-                    if Entry.TypeID == 6877563742545042104 and Entry.FileID not in IDs:
-                        f = MemoryStream(Entry.TocData)
-                        f.seek(32)
-                        strings.append(str(Entry.FileID)+" "+f.bytes(b"", 23).decode()+"\n")
-                        IDs.append(Entry.FileID)
-    with open("C:\\Users\\kboyk\\OneDrive\\Desktop\\New folder\\names.txt", 'w') as f:
-        f.writelines(strings)
-
 def register():
-    #TestTask()
     LoadNormalPalette(Global_palettepath)
     LoadTypeHashes()
     LoadNameHashes()
-
-    for cls in classes_to_register:
+    for cls in classes:
         bpy.utils.register_class(cls)
     Scene.Hd2ToolPanelSettings = PointerProperty(type=Hd2ToolPanelSettings)
-
     bpy.utils.register_class(WM_MT_button_context)
 
 def unregister():
+    bpy.utils.unregister_class(WM_MT_button_context)
     del Scene.Hd2ToolPanelSettings
-    for cls in classes_to_register:
+    for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
 
-    bpy.utils.unregister_class(WM_MT_button_context)
-
-
-# run script
 if __name__=="__main__":
     register()
