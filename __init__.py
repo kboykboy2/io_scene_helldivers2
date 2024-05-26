@@ -3286,30 +3286,28 @@ class WM_MT_button_context(Menu):
             props.object_id     = str(Entry.FileID)
             props.object_typeid = str(Entry.TypeID)
         
-        # NOTE: Is there really a point to doubling up on operators already present inline with every entry? Numerous occurences of this will be commented out henceforth
-
-        # if Global_TocManager.IsInPatch(Entry):
-        #     props = row.operator("helldiver2.archive_removefrompatch", icon='X', text=RemoveFromPatchName)
-        #     props.object_id     = FileIDStr
-        #     props.object_typeid = TypeIDStr
-        # else:
-        #     props = row.operator("helldiver2.archive_addtopatch", icon='PLUS', text=AddToPatchName)
-        #     props.object_id     = FileIDStr
-        #     props.object_typeid = TypeIDStr
+        if Global_TocManager.IsInPatch(Entry):
+            props = row.operator("helldiver2.archive_removefrompatch", icon='X', text=RemoveFromPatchName)
+            props.object_id     = FileIDStr
+            props.object_typeid = TypeIDStr
+        else:
+            props = row.operator("helldiver2.archive_addtopatch", icon='PLUS', text=AddToPatchName)
+            props.object_id     = FileIDStr
+            props.object_typeid = TypeIDStr
 
         # Draw import buttons
         # TODO: Add generic import buttons
         row.separator()
-        # if AreAllMeshes:
-        #     row.operator("helldiver2.archive_mesh_import", icon='IMPORT', text=ImportMeshName).object_id = FileIDStr
+        if AreAllMeshes:
+            row.operator("helldiver2.archive_mesh_import", icon='IMPORT', text=ImportMeshName).object_id = FileIDStr
         if AreAllTextures:
-            # row.operator("helldiver2.texture_import", icon='IMPORT', text=ImportTextureName).object_id = FileIDStr
+            row.operator("helldiver2.texture_import", icon='IMPORT', text=ImportTextureName).object_id = FileIDStr
             if SingleEntry:
                 row.operator("helldiver2.texture_export", icon='EXPORT', text="Export Texture").object_id = str(Entry.FileID)
             else:
                 row.operator("helldiver2.texture_batchexport", icon='EXPORT', text=f"Export {NumSelected} Textures").object_id = FileIDStr
-        # elif AreAllMaterials:
-        #     row.operator("helldiver2.material_import", icon='IMPORT', text=ImportMaterialName).object_id = FileIDStr
+        elif AreAllMaterials:
+            row.operator("helldiver2.material_import", icon='IMPORT', text=ImportMaterialName).object_id = FileIDStr
         # Draw export buttons
         row.separator()
         props = row.operator("helldiver2.archive_object_dump_export", icon='PACKAGE', text=DumpObjectName)
@@ -3320,15 +3318,16 @@ class WM_MT_button_context(Menu):
         # Draw save buttons
         row.separator()
         if AreAllMeshes and SingleEntry:
-            # if SingleEntry:
-            #     row.operator("helldiver2.archive_mesh_save", icon='FILE_BLEND', text="Save Mesh").object_id = str(Entry.FileID)
-            # else:
-            row.operator("helldiver2.archive_mesh_batchsave", icon='FILE_BLEND', text=f"Save {NumSelected} Meshes")
+            if SingleEntry:
+                row.operator("helldiver2.archive_mesh_save", icon='FILE_BLEND', text="Save Mesh").object_id = str(Entry.FileID)
+            else:
+              row.operator("helldiver2.archive_mesh_batchsave", icon='FILE_BLEND', text=f"Save {NumSelected} Meshes")
         elif AreAllTextures and SingleEntry:
-            # row.operator("helldiver2.texture_saveblendimage", icon='FILE_BLEND', text=SaveTextureName).object_id = FileIDStr
-            # if SingleEntry:
-            row.operator("helldiver2.texture_savefromdds", icon='IMAGE_REFERENCE', text="Save Texture From DDs").object_id = str(Entry.FileID)
-        # elif AreAllMaterials: row.operator("helldiver2.material_save", icon='FILE_BLEND', text=SaveMaterialName).object_id = FileIDStr
+            row.operator("helldiver2.texture_saveblendimage", icon='FILE_BLEND', text=SaveTextureName).object_id = FileIDStr
+            if SingleEntry:
+                row.operator("helldiver2.texture_savefromdds", icon='IMAGE_REFERENCE', text="Save Texture From DDs").object_id = str(Entry.FileID)
+        elif AreAllMaterials:
+            row.operator("helldiver2.material_save", icon='FILE_BLEND', text=SaveMaterialName).object_id = FileIDStr
         # Draw copy ID buttons
         if SingleEntry:
             row.separator()
@@ -3339,11 +3338,11 @@ class WM_MT_button_context(Menu):
                 props = row.operator("helldiver2.archive_entryrename", icon='TEXT', text="Rename")
                 props.object_id     = str(Entry.FileID)
                 props.object_typeid = str(Entry.TypeID)
-        # if Entry.IsModified:
-        #     row.separator()
-        #     props = row.operator("helldiver2.archive_undo_mod", icon='TRASH', text=UndoName)
-        #     props.object_id     = FileIDStr
-        #     props.object_typeid = TypeIDStr
+        if Entry.IsModified:
+            row.separator()
+            props = row.operator("helldiver2.archive_undo_mod", icon='TRASH', text=UndoName)
+            props.object_id     = FileIDStr
+            props.object_typeid = TypeIDStr
 
         if SingleEntry:
             row.operator("helldiver2.archive_setfriendlyname", icon='WORDWRAP_ON', text="Set Friendly Name").object_id = str(Entry.FileID)
