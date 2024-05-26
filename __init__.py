@@ -53,6 +53,20 @@ MaterialID  = 16915718763308572383
 
 #region Functions: Miscellaneous
 
+def PrettyPrint(msg, type="info"): # Inspired by FortnitePorting
+    reset = u"\u001b[0m"
+    color = reset
+    match type:
+        case "info":
+            color = u"\u001b[36m"
+        case "warn":
+            color = u"\u001b[31m"
+        case "error":
+            color = u"\u001b[33m"
+        case _:
+            pass
+    print(f"{color}[HD2TOOL]{reset} {msg}")
+
 def DXGI_FORMAT(format):
     Dict = {0: "UNKNOWN", 1: "R32G32B32A32_TYPELESS", 2: "R32G32B32A32_FLOAT", 3: "R32G32B32A32_UINT", 4: "R32G32B32A32_SINT", 5: "R32G32B32_TYPELESS", 6: "R32G32B32_FLOAT", 7: "R32G32B32_UINT", 8: "R32G32B32_SINT", 9: "R16G16B16A16_TYPELESS", 10: "R16G16B16A16_FLOAT", 11: "R16G16B16A16_UNORM", 12: "R16G16B16A16_UINT", 13: "R16G16B16A16_SNORM", 14: "R16G16B16A16_SINT", 15: "R32G32_TYPELESS", 16: "R32G32_FLOAT", 17: "R32G32_UINT", 18: "R32G32_SINT", 19: "R32G8X24_TYPELESS", 20: "D32_FLOAT_S8X24_UINT", 21: "R32_FLOAT_X8X24_TYPELESS", 22: "X32_TYPELESS_G8X24_UINT", 23: "R10G10B10A2_TYPELESS", 24: "R10G10B10A2_UNORM", 25: "R10G10B10A2_UINT", 26: "R11G11B10_FLOAT", 27: "R8G8B8A8_TYPELESS", 28: "R8G8B8A8_UNORM", 29: "R8G8B8A8_UNORM_SRGB", 30: "R8G8B8A8_UINT", 31: "R8G8B8A8_SNORM", 32: "R8G8B8A8_SINT", 33: "R16G16_TYPELESS", 34: "R16G16_FLOAT", 35: "R16G16_UNORM", 36: "R16G16_UINT", 37: "R16G16_SNORM", 38: "R16G16_SINT", 39: "R32_TYPELESS", 40: "D32_FLOAT", 41: "R32_FLOAT", 42: "R32_UINT", 43: "R32_SINT", 44: "R24G8_TYPELESS", 45: "D24_UNORM_S8_UINT", 46: "R24_UNORM_X8_TYPELESS", 47: "X24_TYPELESS_G8_UINT", 48: "R8G8_TYPELESS", 49: "R8G8_UNORM", 50: "R8G8_UINT", 51: "R8G8_SNORM", 52: "R8G8_SINT", 53: "R16_TYPELESS", 54: "R16_FLOAT", 55: "D16_UNORM", 56: "R16_UNORM", 57: "R16_UINT", 58: "R16_SNORM", 59: "R16_SINT", 60: "R8_TYPELESS", 61: "R8_UNORM", 62: "R8_UINT", 63: "R8_SNORM", 64: "R8_SINT", 65: "A8_UNORM", 66: "R1_UNORM", 67: "R9G9B9E5_SHAREDEXP", 68: "R8G8_B8G8_UNORM", 69: "G8R8_G8B8_UNORM", 70: "BC1_TYPELESS", 71: "BC1_UNORM", 72: "BC1_UNORM_SRGB", 73: "BC2_TYPELESS", 74: "BC2_UNORM", 75: "BC2_UNORM_SRGB", 76: "BC3_TYPELESS", 77: "BC3_UNORM", 78: "BC3_UNORM_SRGB", 79: "BC4_TYPELESS", 80: "BC4_UNORM", 81: "BC4_SNORM", 82: "BC5_TYPELESS", 83: "BC5_UNORM", 84: "BC5_SNORM", 85: "B5G6R5_UNORM", 86: "B5G5R5A1_UNORM", 87: "B8G8R8A8_UNORM", 88: "B8G8R8X8_UNORM", 89: "R10G10B10_XR_BIAS_A2_UNORM", 90: "B8G8R8A8_TYPELESS", 91: "B8G8R8A8_UNORM_SRGB", 92: "B8G8R8X8_TYPELESS", 93: "B8G8R8X8_UNORM_SRGB", 94: "BC6H_TYPELESS", 95: "BC6H_UF16", 96: "BC6H_SF16", 97: "BC7_TYPELESS", 98: "BC7_UNORM", 99: "BC7_UNORM_SRGB", 100: "AYUV", 101: "Y410", 102: "Y416", 103: "NV12", 104: "P010", 105: "P016", 106: "420_OPAQUE", 107: "YUY2", 108: "Y210", 109: "Y216", 110: "NV11", 111: "AI44", 112: "IA44", 113: "P8", 114: "A8P8", 115: "B4G4R4A4_UNORM", 130: "P208", 131: "V208", 132: "V408"}
     return Dict[format]
@@ -138,7 +152,7 @@ def PrepareMesh(og_object):
         bpy.ops.mesh.select_all(action='SELECT')
         bpy.ops.uv.select_all(action='SELECT')
         bpy.ops.uv.seams_from_islands()
-    except: print("Error attempting to create seams from uv islands")
+    except: PrettyPrint("Failed to create seams from UV islands. This is not fatal, but will likely cause undesirable results in-game", "warn")
     bpy.ops.object.mode_set(mode='OBJECT')
 
     bm = bmesh.new()
@@ -343,8 +357,8 @@ def CreateModel(model, id, customization_info, bone_names):
         # make object from mesh
         new_object = bpy.data.objects.new(name, new_mesh)
         # set transform
-        print("scale: ", mesh.DEV_Transform.scale)
-        print("location: ", mesh.DEV_Transform.pos)
+        PrettyPrint(f"scale: {mesh.DEV_Transform.scale}")
+        PrettyPrint(f"location: {mesh.DEV_Transform.pos}")
         new_object.scale = (mesh.DEV_Transform.scale[0],mesh.DEV_Transform.scale[1],mesh.DEV_Transform.scale[2])
         new_object.location = (mesh.DEV_Transform.pos[0],mesh.DEV_Transform.pos[1],mesh.DEV_Transform.pos[2])
 
@@ -1127,7 +1141,7 @@ def AddMaterialToBlend(ID, StringrayMat, EmptyMatExists=False):
         # Apply Texture
         try: texImage.image = bpy.data.images[str(TextureID)]
         except:
-            print("Failed to load texture: "+str(TextureID))
+            PrettyPrint(f"Failed to load texture {TextureID}. This is not fatal, but does mean that the materials in Blender will have empty image texture nodes", "warn")
             pass
         idx +=1
 
@@ -1271,7 +1285,7 @@ def SaveStingrayTexture(ID, TocData, GpuData, StreamData, LoadedData):
     Stream = MemoryStream(IOMode="write")
 
     LoadedData.Serialize(Toc, Gpu, Stream)
-    
+
     return [Toc.Data, Gpu.Data, Stream.Data]
 
 #endregion
@@ -1786,7 +1800,7 @@ class StingrayMeshFile:
         self.BoneNames = None
     # -- Serialize Mesh -- #
     def Serialize(self, f, gpu, redo_offsets = False):
-        print("Serialize")
+        PrettyPrint("Serialize")
         if f.IsWriting() and not redo_offsets:
             # duplicate bone info sections if needed
             temp_boneinfos = [None for n in range(len(self.BoneInfoArray))]
@@ -1799,7 +1813,7 @@ class StingrayMeshFile:
                 BoneInfoIdx     = Raw_Mesh.DEV_BoneInfoIndex
                 temp_boneinfos[RealBoneInfoIdx] = self.BoneInfoArray[BoneInfoIdx]
             self.BoneInfoArray = temp_boneinfos
-            print("setting up materials: ")
+            PrettyPrint("Building materials")
             self.SectionsIDs = []
             self.MaterialIDs = []
             Order = 0xffffffff
@@ -1818,7 +1832,7 @@ class StingrayMeshFile:
 
                     # This doesnt do what it was intended to do
                     if Material.DEV_BoneInfoOverride != None:
-                        print("Overriding Material Unknown Values")
+                        PrettyPrint("Overriding unknown material values")
                         Section.unk1 = Material.DEV_BoneInfoOverride
                         Section.unk2 = Material.DEV_BoneInfoOverride
                     else:
@@ -1990,7 +2004,7 @@ class StingrayMeshFile:
         return self
 
     def SerializeGpuData(self, gpu):
-        print("SerializeGpuData")
+        PrettyPrint("SerializeGpuData")
         # Init Raw Meshes If Reading
         if gpu.IsReading():
             self.InitRawMeshes()
@@ -2051,7 +2065,7 @@ class StingrayMeshFile:
                 if gpu.IsReading(): gpu.seek(Stream_Info.IndexBufferOffset + (Section.IndexOffset*IndexStride))
                 else:
                     Section.IndexOffset = IndexOffset
-                    print("Updated Section Offset: ", Section.IndexOffset)
+                    PrettyPrint(f"Updated Section Offset: {Section.IndexOffset}")
                 for fidx in range(int(Section.NumIndices/3)):
                     v1 = IndexInt(mesh.Indices[TotalIndex][0])
                     v2 = IndexInt(mesh.Indices[TotalIndex][1])
@@ -2089,7 +2103,7 @@ class StingrayMeshFile:
                 for Section in Mesh_Info.Sections:
                     Section.VertexOffset = VertexOffset
                     Section.NumVertices  = len(mesh.VertexPositions)
-                    print("Updated VertexOffset Offset: ", Section.VertexOffset)
+                    PrettyPrint(f"Updated VertexOffset Offset: {Section.VertexOffset}")
             MainSection = Mesh_Info.Sections[0]
 
             # get vertices
@@ -2140,8 +2154,8 @@ class StingrayMeshFile:
                     # Get Weights
                     elif type == "bone_weight":
                         if Component.Index > 0: # TODO: add support for this (check archive 9102938b4b2aef9d)
+                            PrettyPrint("Multiple weight indices are unsupported!", "warn")
                             gpu.seek(gpu.tell()+Component.GetSize())
-                            print("Multiple Weight Indices")
                         else:
                             mesh.VertexWeights[vidx] = Component.SerializeComponent(gpu, mesh.VertexWeights[vidx])
 
@@ -2198,7 +2212,7 @@ class StingrayMeshFile:
         for n in range(len(self.MeshInfoArray)):
             NewMesh     = RawMeshClass()
             Mesh_Info   = self.MeshInfoArray[n]
-            print("Num: ", len(self.StreamInfoArray), " Index: ", Mesh_Info.StreamIndex)
+            # print("Num: ", len(self.StreamInfoArray), " Index: ", Mesh_Info.StreamIndex)
             Stream_Info = self.StreamInfoArray[Mesh_Info.StreamIndex]
             NewMesh.MeshInfoIndex = n
             NewMesh.MeshID = Mesh_Info.MeshID
@@ -2301,7 +2315,7 @@ def SaveStingrayMesh(ID, TocData, GpuData, StreamData, StingrayMesh):
         for mesh in FinalMeshes:
             if mesh.LodIndex == 0:
                 lod0 = mesh
-        print(lod0)
+        # print(lod0)
         if lod0 != None:
             for n in range(len(FinalMeshes)):
                 if FinalMeshes[n].IsLod():
@@ -2556,11 +2570,11 @@ class ImportStingrayMeshOperator(Operator):
                     Errors.append([EntryID, error])
 
         if len(Errors) > 0:
-            print("\nThese errors occurred while attempting to load meshes...")
+            PrettyPrint("\nThese errors occurred while attempting to load meshes...", "error")
             idx = 0
             for error in Errors:
-                print(f"  Error {idx}: for mesh {error[0]}")
-                print(f"    {error[1]}\n")
+                PrettyPrint(f"  Error {idx}: for mesh {error[0]}", "error")
+                PrettyPrint(f"    {error[1]}\n", "error")
                 idx += 1
             raise Exception("One or more meshes failed to load")
         return{'FINISHED'}
@@ -2604,6 +2618,7 @@ class BatchSaveStingrayMeshOperator(Operator):
 #region Operators: Textures
 
 # save texture from blender to archive button
+# TODO: allow the user to choose an image, instead of looking for one of the same name
 class SaveTextureFromBlendImageOperator(Operator):
     bl_label = "Save Texture"
     bl_idname = "helldiver2.texture_saveblendimage"
@@ -2614,10 +2629,10 @@ class SaveTextureFromBlendImageOperator(Operator):
         for Entry in Entries:
             if Entry != None:
                 if not Entry.IsLoaded: Entry.Load()
-                #BlendImageToStingrayTexture(bpy.data.images[str(self.object_id)], Entry.LoadedData)
-                try: BlendImageToStingrayTexture(bpy.data.images[str(self.object_id)], Entry.LoadedData)
-                except: print("Saving Texture, but no blend texture was found, using original"); pass
-                #TODO: allow the user to choose an image, instead of looking for one of the same name
+                try:
+                    BlendImageToStingrayTexture(bpy.data.images[str(self.object_id)], Entry.LoadedData)
+                except:
+                    PrettyPrint("No blend texture was found for saving, using original", "warn"); pass
             Global_TocManager.Save(Entry.FileID, TexID)
         return{'FINISHED'}
 
@@ -2761,10 +2776,8 @@ class ShowMaterialEditorOperator(Operator):
             if not Entry.IsLoaded: Entry.Load(False, False)
             mat = Entry.LoadedData
             if mat.DEV_ShowEditor:
-                print("MakeFalse")
                 mat.DEV_ShowEditor = False
             else:
-                print("MakeTrue")
                 mat.DEV_ShowEditor = True
         return{'FINISHED'}
 
