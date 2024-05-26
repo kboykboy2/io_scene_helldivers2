@@ -1035,8 +1035,6 @@ class TocManager():
 
 #endregion
 
-Global_TocManager = TocManager()
-
 #region Classes and Functions: Stingray Materials
 
 class StingrayMaterial:
@@ -2743,8 +2741,8 @@ class AddMaterialOperator(Operator):
     bl_idname = "helldiver2.material_add"
 
     materials = (
-        ("basic.dat", "Basic", "The default template derived from the material used for bugs. Viable for use on pretty much anything if you aren't seeking the highest fidelity."),
-        ("test.dat", "Test", "TEST"),
+        ("basic.material", "Basic", "The default template, viable for use on pretty much anything. Sourced from a terminid."),
+        ("unlit.material", "Unlit (Fake Emission)", "A pure white material which is not affected by shading, but also does not actually emit light. Sourced from the Super Destroyer."), # TODO: Find out if a value in this can control its color
     )
 
     selected_material: EnumProperty(items=materials, name="Template")
@@ -3399,6 +3397,8 @@ classes = (
     DuplicateEntryOperator,
     SetEntryFriendlyNameOperator,
 )
+
+Global_TocManager = TocManager()
 
 def register():
     if Global_CPPHelper == None: raise Exception("HDTool_Helper is required by the addon but failed to load!")
