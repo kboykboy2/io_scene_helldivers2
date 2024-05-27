@@ -457,14 +457,25 @@ def CreateModel(model, id, customization_info, bone_names):
 
 def GetTextureTypeFromID(ID):
     match ID:
+        case 7885441303298036614:
         case 14423187101809176546:
             return "color: "
+        case 12438577491339355024:
+        case 15534330449358682546:
+            return "color/metallic: "
         case 12451968300768537108:
             return "sss color: "
+        case 1426993524551476301:
         case 16331558339684530227:
             return "pbr: "
+        case 3086617583118868735:
         case 6363549403025827661:
             return "normal: "
+        case 4076101696407525357:
+        case 11580353517303692747:
+            return "normal/ao/cavity: "
+        case 9910850486928628265:
+            return "emission: "
         case _:
             return ""
 
@@ -2741,7 +2752,10 @@ class AddMaterialOperator(Operator):
     bl_idname = "helldiver2.material_add"
 
     materials = (
-        ("basic.material", "Basic", "The default template, viable for use on pretty much anything. Sourced from a terminid."),
+        ("default.material", "Default", "The default template, viable for use on pretty much anything. Sourced from a terminid."),
+        ("basic.material", "Basic (Metallic)", "A basic material with a color and normal map. The color map contains a metallic alpha and the normal map contains AO and cavity channels. Sourced from a random prop."),
+        ("basicPBR.material", "Basic (PBR)", "A basic material with a color, normal and PBR map, very similar to the default. Sourced from a trash bag prop."),
+        ("emissive.material", "Emissive", "A basic material with a color and normal map, as well as an emission map. The color map contains a metallic alpha and the normal map contains AO and cavity channels. Sourced from a vending machine."),
         ("unlit.material", "Unlit (Fake Emission)", "A pure white material which is not affected by shading, but also does not actually emit light. Sourced from the Super Destroyer."), # TODO: Find out if a value in this can control its color
     )
 
