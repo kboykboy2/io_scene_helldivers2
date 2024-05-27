@@ -2351,6 +2351,11 @@ class LoadArchiveOperator(Operator, ImportHelper):
 
     def execute(self, context):
         Global_TocManager.LoadArchive(self.filepath, True, self.is_patch)
+
+        # Redraw
+        for area in context.screen.areas:
+            if area.type == "VIEW_3D": area.tag_redraw()
+        
         return{'FINISHED'}
 
 class UnloadArchivesOperator(Operator):
@@ -2772,6 +2777,11 @@ class AddMaterialOperator(Operator):
         Entry.TocData       = data
 
         Global_TocManager.AddNewEntryToPatch(Entry)
+
+        # Redraw
+        for area in context.screen.areas:
+            if area.type == "VIEW_3D": area.tag_redraw()
+        
         return{'FINISHED'}
 
     def invoke(self, context, event):
@@ -3233,7 +3243,6 @@ class WM_MT_button_context(Menu):
     bl_label = "Entry Context Menu"
 
     def draw_entry_buttons(self, row, Entry):
-        #TODO: Figure out how to redraw gui panel to update it
         if not Entry.IsSelected:
             Global_TocManager.SelectEntries([Entry])
 
