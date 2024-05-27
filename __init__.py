@@ -3247,28 +3247,18 @@ class WM_MT_button_context(Menu):
             elif SelectedEntry.TypeID == MaterialID:
                 AreAllTextures = False
                 AreAllMeshes = False
-        if SingleEntry:
-            RemoveFromPatchName = "Remove From Patch"
-            AddToPatchName = "Add To Patch"
-            ImportMeshName = "Import Mesh"
-            ImportTextureName = "Import Texture"
-            ImportMaterialName = "Import Material"
-            DumpObjectName = "Dump Object"
-            SaveTextureName = "Save Blender Texture"
-            SaveMaterialName = "Save Material"
-            UndoName = "Undo Modifications"
-            CopyName = "Copy Entry"
-        else:
-            RemoveFromPatchName = f"Remove {NumSelected} From Patch"
-            AddToPatchName = f"Add {NumSelected} To Patch"
-            ImportMeshName = f"Import {NumSelected} Meshes"
-            ImportTextureName = f"Import {NumSelected} Textures"
-            ImportMaterialName = f"Import {NumSelected} Materials"
-            DumpObjectName = f"Dump {NumSelected} Objects"
-            SaveTextureName = f"Save Blender {NumSelected} Textures"
-            SaveMaterialName = f"Save {NumSelected} Materials"
-            UndoName = f"Undo {NumSelected} Modifications"
-            CopyName = f"Copy {NumSelected} Entries"
+        
+        RemoveFromPatchName = "Remove From Patch" if SingleEntry else f"Remove {NumSelected} From Patch"
+        AddToPatchName = "Add To Patch" if SingleEntry else f"Add {NumSelected} To Patch"
+        ImportMeshName = "Import Mesh" if SingleEntry else f"Import {NumSelected} Meshes"
+        ImportTextureName = "Import Texture" if SingleEntry else f"Import {NumSelected} Textures"
+        ImportMaterialName = "Import Material" if SingleEntry else f"Import {NumSelected} Materials"
+        DumpObjectName = "Dump Object" if SingleEntry else f"Dump {NumSelected} Objects"
+        SaveTextureName = "Save Blender Texture" if SingleEntry else f"Save Blender {NumSelected} Textures"
+        SaveMaterialName = "Save Material" if SingleEntry else f"Save {NumSelected} Materials"
+        UndoName = "Undo Modifications" if SingleEntry else f"Undo {NumSelected} Modifications"
+        CopyName = "Copy Entry" if SingleEntry else f"Copy {NumSelected} Entries"
+        
         # Draw seperator
         row.separator()
         row.label(text="---------- HellDivers2 ----------")
