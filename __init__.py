@@ -2676,6 +2676,19 @@ class ExportTextureOperator(Operator, ExportHelper):
             with open(self.filepath, 'w+b') as f:
                 f.write(Entry.LoadedData.ToDDS())
         return{'FINISHED'}
+    
+    def invoke(self, context, _event):
+        if not self.filepath:
+            blend_filepath = context.blend_data.filepath
+            if not blend_filepath:
+                blend_filepath = self.object_id
+            else:
+                blend_filepath = os.path.splitext(blend_filepath)[0]
+
+            self.filepath = blend_filepath + self.filename_ext
+
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
 
 # batch export texture to file
 class BatchExportTextureOperator(Operator):
@@ -2724,6 +2737,11 @@ class SaveTextureFromDDSOperator(Operator, ImportHelper):
                 Entry.SetData(Toc.Data, Gpu.Data, Stream.Data, False)
 
                 Global_TocManager.Save(int(self.object_id), TexID)
+        
+        # Redraw
+        for area in context.screen.areas:
+            if area.type == "VIEW_3D": area.tag_redraw()
+
         return{'FINISHED'}
 
 #endregion
