@@ -2367,6 +2367,11 @@ class CreatePatchFromActiveOperator(Operator):
 
     def execute(self, context):
         Global_TocManager.CreatePatchFromActive()
+
+        # Redraw
+        for area in context.screen.areas:
+            if area.type == "VIEW_3D": area.tag_redraw()
+        
         return{'FINISHED'}
 
 class PatchArchiveOperator(Operator):
