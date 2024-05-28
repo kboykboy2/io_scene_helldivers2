@@ -2622,6 +2622,27 @@ class BatchSaveStingrayMeshOperator(Operator):
             Global_TocManager.Save(int(ID), MeshID)
         return{'FINISHED'}
 
+class CopyCustomPropertiesOperator(Operator):
+    bl_label  = "Copy Custom Properties from Selected to Active"
+    bl_idname = "helldiver2.copy_custom_properties"
+
+    def execute(self, context):
+        if len(bpy.context.selected_objects) > 2:
+            self.report({'ERROR'}, "Copy Custom Properties can only take a selection of 2 objects! Select the original object first, then the object you wish to copy the properties to.")
+            return{'FINISHED'}
+
+        target, source = bpy.context.selected_objects
+        props = ["BoneInfoIndex", "MeshInfoIndex", "Z_ObjectID", "Z_CustomizationBodyType", "Z_CustomizationPieceType", "Z_CustomizationSlot", "Z_CustomizationWeight"]
+        for k, v in source.items():
+            if k in props:
+                target[k] = v
+        
+        # Redraw
+        for area in context.screen.areas:
+            if area.type == "PROPERTIES": area.tag_redraw()
+        
+        return{'FINISHED'}
+
 #endregion
 
 #region Operators: Textures
@@ -3403,6 +3424,7 @@ classes = (
     RenamePatchEntryOperator,
     DuplicateEntryOperator,
     SetEntryFriendlyNameOperator,
+    CopyCustomPropertiesOperator,
 )
 
 Global_TocManager = TocManager()
