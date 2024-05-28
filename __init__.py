@@ -457,22 +457,17 @@ def CreateModel(model, id, customization_info, bone_names):
 
 def GetTextureTypeFromID(ID):
     match ID:
-        case 7885441303298036614:
-        case 14423187101809176546:
+        case 7885441303298036614 | 14423187101809176546:
             return "color: "
-        case 12438577491339355024:
-        case 15534330449358682546:
+        case 12438577491339355024 | 15534330449358682546:
             return "color/metallic: "
         case 12451968300768537108:
             return "sss color: "
-        case 1426993524551476301:
-        case 16331558339684530227:
+        case 1426993524551476301 | 16331558339684530227:
             return "pbr: "
-        case 3086617583118868735:
-        case 6363549403025827661:
+        case 3086617583118868735 | 6363549403025827661:
             return "normal: "
-        case 4076101696407525357:
-        case 11580353517303692747:
+        case 4076101696407525357 | 11580353517303692747:
             return "normal/ao/cavity: "
         case 9910850486928628265:
             return "emission: "
