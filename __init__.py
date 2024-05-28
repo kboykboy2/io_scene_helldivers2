@@ -1098,7 +1098,7 @@ def SaveStingrayMaterial(ID, TocData, GpuData, StreamData, LoadedData):
             # get texture data
             StingrayTex = StingrayTexture()
             with open(mat.DEV_DDSPaths[TexIdx], 'r+b') as f:
-                StingrayTex.FromDDs(f.read())
+                StingrayTex.FromDDS(f.read())
             Toc = MemoryStream(IOMode="write")
             Gpu = MemoryStream(IOMode="write")
             Stream = MemoryStream(IOMode="write")
@@ -1194,7 +1194,7 @@ class StingrayTexture:
         if Toc.IsReading(): self.MipMapInfo = [StingrayMipmapInfo() for n in range(15)]
         self.MipMapInfo = [mipmapInfo.Serialize(Toc) for mipmapInfo in self.MipMapInfo]
         self.ddsHeader  = Toc.bytes(self.ddsHeader, 148)
-        self.ParseDDsHeader()
+        self.ParseDDSHeader()
 
         if Toc.IsWriting():
             Gpu.bytes(self.rawTex)
@@ -1204,14 +1204,14 @@ class StingrayTexture:
             else:
                 self.rawTex = Gpu.Data
 
-    def ToDDs(self):
+    def ToDDS(self):
         return self.ddsHeader + self.rawTex
     
-    def FromDDs(self, dds):
+    def FromDDS(self, dds):
         self.ddsHeader = dds[:148]
         self.rawTex    = dds[148::]
     
-    def ParseDDsHeader(self):
+    def ParseDDSHeader(self):
         dds = MemoryStream(self.ddsHeader, IOMode="read")
         dds.seek(12)
         self.Height = dds.uint32(0)
@@ -1241,7 +1241,7 @@ def LoadStingrayTexture(ID, TocData, GpuData, StreamData, Reload, MakeBlendObjec
 
     StingrayTex = StingrayTexture()
     StingrayTex.Serialize(MemoryStream(TocData), MemoryStream(GpuData), MemoryStream(StreamData))
-    dds = StingrayTex.ToDDs()
+    dds = StingrayTex.ToDDS()
 
     if MakeBlendObject and not (exists and not Reload):
         tempdir = tempfile.gettempdir()
@@ -1275,7 +1275,7 @@ def BlendImageToStingrayTexture(image, StingrayTex):
     
     if os.path.isfile(dds_path):
         with open(dds_path, 'r+b') as f:
-            StingrayTex.FromDDs(f.read())
+            StingrayTex.FromDDS(f.read())
     else:
         raise Exception("Failed to convert TGA to DDS")
 
@@ -2674,7 +2674,7 @@ class ExportTextureOperator(Operator, ExportHelper):
         if Entry != None:
             data = Entry.Load(False, False)
             with open(self.filepath, 'w+b') as f:
-                f.write(Entry.LoadedData.ToDDs())
+                f.write(Entry.LoadedData.ToDDS())
         return{'FINISHED'}
 
 # batch export texture to file
@@ -2694,7 +2694,7 @@ class BatchExportTextureOperator(Operator):
             if Entry != None:
                 data = Entry.Load(False, False)
                 with open(self.directory + str(Entry.FileID)+".dds", 'w+b') as f:
-                    f.write(Entry.LoadedData.ToDDs())
+                    f.write(Entry.LoadedData.ToDDS())
         return{'FINISHED'}
 
     def invoke(self, context, event):
@@ -2702,7 +2702,7 @@ class BatchExportTextureOperator(Operator):
         return {'RUNNING_MODAL'}
 
 # import texture from archive button
-class SaveTextureFromDDsOperator(Operator, ImportHelper):
+class SaveTextureFromDDSOperator(Operator, ImportHelper):
     bl_label = "Save Texture"
     bl_idname = "helldiver2.texture_savefromdds"
 
@@ -2715,7 +2715,7 @@ class SaveTextureFromDDsOperator(Operator, ImportHelper):
                 Entry.Load()
                 StingrayTex = Entry.LoadedData
                 with open(self.filepath, 'r+b') as f:
-                    StingrayTex.FromDDs(f.read())
+                    StingrayTex.FromDDS(f.read())
                 Toc = MemoryStream(IOMode="write")
                 Gpu = MemoryStream(IOMode="write")
                 Stream = MemoryStream(IOMode="write")
@@ -3343,7 +3343,7 @@ class WM_MT_button_context(Menu):
         elif AreAllTextures and SingleEntry:
             row.operator("helldiver2.texture_saveblendimage", icon='FILE_BLEND', text=SaveTextureName).object_id = FileIDStr
             if SingleEntry:
-                row.operator("helldiver2.texture_savefromdds", icon='IMAGE_REFERENCE', text="Save Texture From DDs").object_id = str(Entry.FileID)
+                row.operator("helldiver2.texture_savefromdds", icon='IMAGE_REFERENCE', text="Save Texture From DDS").object_id = str(Entry.FileID)
         elif AreAllMaterials:
             row.operator("helldiver2.material_save", icon='FILE_BLEND', text=SaveMaterialName).object_id = FileIDStr
         # Draw copy ID buttons
@@ -3398,7 +3398,7 @@ classes = (
     CopyArchiveEntryOperator,
     PasteArchiveEntryOperator,
     ClearClipboardOperator,
-    SaveTextureFromDDsOperator,
+    SaveTextureFromDDSOperator,
     HelpOperator,
     ArchiveSpreadsheetOperator,
     UnloadArchivesOperator,
