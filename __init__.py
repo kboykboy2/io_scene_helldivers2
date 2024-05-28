@@ -2819,6 +2819,11 @@ class SetMaterialTexture(Operator, ImportHelper):
         if Entry != None:
             if Entry.IsLoaded:
                 Entry.LoadedData.DEV_DDSPaths[self.tex_idx] = self.filepath
+        
+        # Redraw
+        for area in context.screen.areas:
+            if area.type == "VIEW_3D": area.tag_redraw()
+        
         return{'FINISHED'}
 
 #endregion
