@@ -27,5 +27,6 @@ jobs:
       - uses: ncipollo/release-action@v1
         with:
           artifacts: "${{env.PROJECT_NAME}}.zip"
+          name: "${{env.PROJECT_NAME}}"
           tag: latest
           allowUpdates: true
