@@ -42,12 +42,18 @@ Global_CPPHelper = ctypes.cdll.LoadLibrary(Global_dllpath) if os.path.isfile(Glo
 
 #endregion
 
-#region Common Hashes
+#region Common Hashes & Lookups
 
 CompositeMeshID = 14191111524867688662
 MeshID = 16187218042980615487
 TexID  = 14790446551990181426
 MaterialID  = 16915718763308572383
+
+TextureTypeLookup = {
+    "default": ("pbr: ", "", "", "", "", "normal: ", "", "sss color: ", "", "color: ", "", "", ""),
+    "basic": ("pbr: ", "color: ", "normal: "),
+    "emissive": ("normal/ao/cavity: ", "emission: ", "color/metallic: ")
+}
 
 #endregion
 
@@ -455,25 +461,6 @@ def CreateModel(model, id, customization_info, bone_names):
 
 #region Functions: Stingray Hashing
 
-def GetTextureTypeFromID(ID):
-    match ID:
-        case 7885441303298036614 | 14423187101809176546:
-            return "color: "
-        case 12438577491339355024 | 15534330449358682546:
-            return "color/metallic: "
-        case 12451968300768537108:
-            return "sss color: "
-        case 1426993524551476301 | 16331558339684530227:
-            return "pbr: "
-        case 3086617583118868735 | 6363549403025827661:
-            return "normal: "
-        case 4076101696407525357 | 11580353517303692747:
-            return "normal/ao/cavity: "
-        case 9910850486928628265:
-            return "emission: "
-        case _:
-            return ""
-
 def GetTypeNameFromID(ID):
     for hash_info in Global_TypeHashes:
         if int(ID) == hash_info[0]:
@@ -594,6 +581,7 @@ class TocEntry:
         self.IsModified = False
         self.IsCreated  = False # custom created, can be removed from archive
         self.IsSelected = False
+        self.MaterialTemplate = None # for determining tuple to use for labeling textures in the material editor
         self.DEV_DrawIndex = -1
     # -- Serialize TocEntry -- #
     def Serialize(self, TocFile, Index=0):
@@ -2775,11 +2763,9 @@ class AddMaterialOperator(Operator):
     bl_idname = "helldiver2.material_add"
 
     materials = (
-        ("default.material", "Default", "The default template, viable for use on pretty much anything. Sourced from a terminid."),
-        ("basic.material", "Basic (Metallic)", "A basic material with a color and normal map. The color map contains a metallic alpha and the normal map contains AO and cavity channels. Sourced from a random prop."),
-        ("basicPBR.material", "Basic (PBR)", "A basic material with a color, normal and PBR map, very similar to the default. Sourced from a trash bag prop."),
-        ("emissive.material", "Emissive", "A basic material with a color and normal map, as well as an emission map. The color map contains a metallic alpha and the normal map contains AO and cavity channels. Sourced from a vending machine."),
-        ("unlit.material", "Unlit (Fake Emission)", "A pure white material which is not affected by shading, but also does not actually emit light. Sourced from the Super Destroyer."), # TODO: Find out if a value in this can control its color
+        ("default", "Default", "The default template, viable for use on pretty much anything. Sourced from a terminid."),
+        ("basic", "Basic", "A basic material with a color, normal, and PBR map. Sourced from a trash bag prop."),
+        ("emissive", "Emissive", "A basic material with a color, normal, and emission map. Sourced from a vending machine."),
     )
 
     selected_material: EnumProperty(items=materials, name="Template")
@@ -2788,8 +2774,9 @@ class AddMaterialOperator(Operator):
         Entry = TocEntry()
         Entry.FileID = r.randint(1, 0xffffffffffffffff)
         Entry.TypeID = MaterialID
+        Entry.MaterialTemplate = self.selected_material
         Entry.IsCreated = True
-        with open(f"{Global_materialpath}\\{self.selected_material}", 'r+b') as f:
+        with open(f"{Global_materialpath}\\{self.selected_material}.material", 'r+b') as f:
             data = f.read()
         Entry.TocData_OLD   = data
         Entry.TocData       = data
@@ -3075,22 +3062,19 @@ class HellDivers2ToolsPanel(Panel):
     bl_category = "Modding"
 
     def draw_material_editor(self, Entry, layout, row):
-        row.operator("helldiver2.material_showeditor", icon='MOD_LINEART', text="").object_id = str(Entry.FileID)
         if Entry.IsLoaded:
             mat = Entry.LoadedData
             if mat.DEV_ShowEditor:
-                for TexIndex in range(len(mat.TexIDs)):
-                    row = layout.row()
-                    row.separator(); row.separator(); row.separator()
-                    textureType = GetTextureTypeFromID(mat.TexIDs[TexIndex])
-                    if mat.DEV_DDSPaths[TexIndex] != None:
-                        filepath = Path(mat.DEV_DDSPaths[TexIndex])
-                        row.label(text=GetTextureTypeFromID(mat.TexIDs[TexIndex])+filepath.name, icon='FILE_IMAGE')
-                    else:
-                        row.label(text=textureType+str(mat.TexIDs[TexIndex]), icon='FILE_IMAGE')
+                for i, t in enumerate(mat.TexIDs):
+                    row = layout.row(); row.separator(factor=2.0)
+                    ddsPath = mat.DEV_DDSPaths[i]
+                    if ddsPath != None: filepath = Path(ddsPath)
+                    prefix = TextureTypeLookup[Entry.MaterialTemplate][i] if Entry.MaterialTemplate != None else ""
+                    label = filepath.name if ddsPath != None else str(t)
+                    row.label(text=prefix+label, icon='FILE_IMAGE')
                     props = row.operator("helldiver2.material_settex", icon='FILEBROWSER', text="")
                     props.object_id = str(Entry.FileID)
-                    props.tex_idx   = TexIndex
+                    props.tex_idx = i
 
     def draw_entry_buttons(self, box, row, Entry, PatchOnly):
         if Entry.TypeID == MeshID:
@@ -3102,6 +3086,7 @@ class HellDivers2ToolsPanel(Panel):
         elif Entry.TypeID == MaterialID:
             row.operator("helldiver2.material_save", icon='FILE_BLEND', text="").object_id = str(Entry.FileID)
             row.operator("helldiver2.material_import", icon='IMPORT', text="").object_id = str(Entry.FileID)
+            row.operator("helldiver2.material_showeditor", icon='MOD_LINEART', text="").object_id = str(Entry.FileID)
             self.draw_material_editor(Entry, box, row)
         if Global_TocManager.IsInPatch(Entry):
             props = row.operator("helldiver2.archive_removefrompatch", icon='FAKE_USER_ON', text="")
@@ -3149,7 +3134,7 @@ class HellDivers2ToolsPanel(Panel):
             row.prop(scene.Hd2ToolPanelSettings, "AutoLods")
 
         # Draw Archive Import/Export Buttons
-        row = layout.row(); row = layout.row(align=True)
+        row = layout.row(); row = layout.row()
         row.operator("helldiver2.archive_import", icon= 'IMPORT').is_patch = False
         row.operator("helldiver2.archive_unloadall", icon= 'FILE_REFRESH', text="")
         row = layout.row()
@@ -3160,7 +3145,7 @@ class HellDivers2ToolsPanel(Panel):
             Global_TocManager.SetActiveByName(scene.Hd2ToolPanelSettings.LoadedArchives)
 
         # Draw Patch Stuff
-        row = layout.row(); row = layout.row(align=True)
+        row = layout.row(); row = layout.row()
         row.operator("helldiver2.archive_createpatch", icon= 'COLLECTION_NEW', text="New Patch")
         row.operator("helldiver2.archive_export", icon= 'DISC', text="Write Patch")
         row = layout.row()
@@ -3225,7 +3210,7 @@ class HellDivers2ToolsPanel(Panel):
                 if typeName == "material": row.operator("helldiver2.material_add", icon='FILE_NEW', text="")
 
                 # Draw Archive Entries
-                col = box.column(align=True)
+                col = box.column()
                 for EntryInfo in DisplayTocEntries:
                     Entry = EntryInfo[0]
                     PatchOnly = EntryInfo[1]
@@ -3255,7 +3240,7 @@ class HellDivers2ToolsPanel(Panel):
                     props.object_id     = str(Entry.FileID)
                     props.object_typeid = str(Entry.TypeID)
                     # Draw Entry Buttons
-                    self.draw_entry_buttons(box, row, PatchEntry, PatchOnly)
+                    self.draw_entry_buttons(col, row, PatchEntry, PatchOnly)
                     # Update Draw Chain
                     DrawChain.append(PatchEntry)
             Global_TocManager.DrawChain = DrawChain
