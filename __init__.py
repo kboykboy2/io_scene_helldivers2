@@ -1,6 +1,6 @@
 bl_info = {
     "name": "Helldivers 2 Archives",
-    "blender": (3, 1, 2), # Significant work carried out on 4.0, should this be increased in case of API incompatibilities?
+    "blender": (4, 0, 0),
     "category": "Import-Export",
 }
 
