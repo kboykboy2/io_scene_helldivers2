@@ -2333,7 +2333,11 @@ class LoadArchiveOperator(Operator, ImportHelper):
     is_patch: BoolProperty(name="is_patch", default=False, options={'HIDDEN'})
 
     def execute(self, context):
-        Global_TocManager.LoadArchive(self.filepath, True, self.is_patch)
+        # Sanitize path by removing any provided extension, so the correct TOC file is loaded
+        path = Path(self.filepath)
+        path = path.with_suffix("")
+
+        Global_TocManager.LoadArchive(str(path), True, self.is_patch)
 
         # Redraw
         for area in context.screen.areas:
