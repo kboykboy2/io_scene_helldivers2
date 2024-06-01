@@ -2335,7 +2335,7 @@ class LoadArchiveOperator(Operator, ImportHelper):
     def execute(self, context):
         # Sanitize path by removing any provided extension, so the correct TOC file is loaded
         path = Path(self.filepath)
-        path = path.with_suffix("")
+        if not path.suffix.startswith(".patch_"): path = path.with_suffix("")
 
         Global_TocManager.LoadArchive(str(path), True, self.is_patch)
 
