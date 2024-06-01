@@ -2767,12 +2767,12 @@ class AddMaterialOperator(Operator):
     bl_idname = "helldiver2.material_add"
 
     materials = (
-        ("default", "Default", "The default template, viable for use on pretty much anything. Sourced from a terminid."),
+        ("original", "Original", "The original template used for all mods uploaded to Nexus prior to the addon's public release, which is bloated with additional unnecessary textures. Sourced from a terminid."),
         ("basic", "Basic", "A basic material with a color, normal, and PBR map. Sourced from a trash bag prop."),
         ("emissive", "Emissive", "A basic material with a color, normal, and emission map. Sourced from a vending machine."),
     )
 
-    selected_material: EnumProperty(items=materials, name="Template")
+    selected_material: EnumProperty(items=materials, name="Template", default=1)
 
     def execute(self, context):
         Entry = TocEntry()
