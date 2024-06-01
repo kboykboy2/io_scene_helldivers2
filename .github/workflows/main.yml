@@ -19,6 +19,7 @@ jobs:
           repository: "microsoft/DirectXTex"
           latest: true
           fileName: "texconv.exe"
+          out-file-path: "deps"
       - uses: thedoctor0/zip-release@0.7.5
         with:
           type: "zip"
