@@ -24,7 +24,7 @@ jobs:
         with:
           type: "zip"
           filename: "${{env.PROJECT_NAME}}.zip"
-          exclusions: "*.git*;README.md"
+          exclusions: "*.git* README.md"
       - uses: ncipollo/release-action@v1
         with:
           artifacts: "${{env.PROJECT_NAME}}.zip"
