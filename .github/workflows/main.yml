@@ -14,12 +14,14 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: "io_scene_helldivers2/"
       - uses: robinraju/release-downloader@v1.10
         with:
           repository: "microsoft/DirectXTex"
           latest: true
           fileName: "texconv.exe"
-          out-file-path: "deps"
+          out-file-path: "io_scene_helldivers2/deps"
       - uses: thedoctor0/zip-release@0.7.5
         with:
           type: "zip"
